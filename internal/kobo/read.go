@@ -4,6 +4,7 @@ package kobo
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 
 	"github.com/librito-io/kobo-agent/internal/transform"
 
@@ -47,7 +48,10 @@ ORDER BY c.Title, b.DateCreated`
 // the agent must never read a stale pre-checkpoint snapshot. `mode=ro` keeps
 // the agent from mutating the user's DB or forcing a checkpoint.
 func ReadHighlights(path string) ([]RawBookmark, error) {
-	dsn := fmt.Sprintf("file:%s?mode=ro", path)
+	// Escape the path so URI-special chars in it (# truncating as a fragment,
+	// ?/& injecting DSN params that could override mode=ro) are encoded as path
+	// data rather than interpreted. mode=ro is appended as a real query param.
+	dsn := "file:" + url.PathEscape(path) + "?mode=ro"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open kobo db: %w", err)

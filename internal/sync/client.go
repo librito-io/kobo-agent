@@ -72,6 +72,11 @@ func PostImport(baseURL, token string, items []transform.KoboImportItem) (Import
 		if msg == "" {
 			msg = strings.TrimSpace(string(respBody))
 		}
+		// Include the machine error code when present — it's the stable handle
+		// (e.g. "unauthorized", "payload_too_large") for diagnosing a failure.
+		if se.Error != "" {
+			return ImportResult{}, fmt.Errorf("import failed: %d %s: %s", resp.StatusCode, se.Error, msg)
+		}
 		return ImportResult{}, fmt.Errorf("import failed: %d %s", resp.StatusCode, msg)
 	}
 

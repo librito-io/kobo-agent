@@ -6,3 +6,6 @@ go.work.sum
 /dist/
 librito-kobo-agent
 *.test
+
+# branch-review tooling artifacts
+.claude/

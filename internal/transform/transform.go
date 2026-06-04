@@ -56,7 +56,7 @@ func hasZoneDesignator(s string) bool {
 	// hyphens don't count). Offsets are the trailing 6 chars (±HH:MM).
 	if t := strings.IndexByte(s, 'T'); t >= 0 {
 		rest := s[t:]
-		if strings.ContainsAny(rest, "+") || strings.LastIndexByte(rest, '-') > 0 {
+		if strings.Contains(rest, "+") || strings.LastIndexByte(rest, '-') > 0 {
 			return true
 		}
 	}
@@ -103,6 +103,13 @@ func NormalizeISBN(raw string) *string {
 		return r
 	}, raw)
 
+	// A real ISBN is ASCII (digits + optional trailing X). Reject any non-ASCII
+	// up front so the length-switch below can slice by byte index without ever
+	// landing mid-rune.
+	if !isASCII(s) {
+		return nil
+	}
+
 	switch len(s) {
 	case 13:
 		if allDigits(s) {
@@ -128,3 +135,12 @@ func allDigits(s string) bool {
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}

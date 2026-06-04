@@ -2,6 +2,7 @@ package kobo
 
 import (
 	"database/sql"
+	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -79,10 +80,17 @@ func defaultFixtureRows() []fixtureRow {
 // (keyed by the chapter-fragment ContentID) carrying the chapter title.
 func writeFixtureDB(t *testing.T, rows []fixtureRow) string {
 	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "KoboReader.sqlite")
+	path := filepath.Join(t.TempDir(), "KoboReader.sqlite")
+	writeFixtureDBAt(t, path, rows)
+	return path
+}
 
-	db, err := sql.Open("sqlite", "file:"+path)
+// writeFixtureDBAt builds the fixture at an explicit path (for tests that need
+// an awkward path, e.g. one containing URI-special characters). The DSN here
+// uses url.PathEscape so the helper itself isn't subject to the bug under test.
+func writeFixtureDBAt(t *testing.T, path string, rows []fixtureRow) {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+url.PathEscape(path))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,5 +132,4 @@ func writeFixtureDB(t *testing.T, rows []fixtureRow) string {
 			t.Fatal(err)
 		}
 	}
-	return path
 }
