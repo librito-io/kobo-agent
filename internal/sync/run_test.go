@@ -2,6 +2,8 @@ package sync
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -64,5 +66,60 @@ func TestRun_DryRunBuildsItemsNoPost(t *testing.T) {
 	}
 	if !foundJunk {
 		t.Fatal("expected the calibre-isbn highlight in built items")
+	}
+}
+
+// The live (non-dry-run) path is the agent's whole reason to exist and is the
+// default. This exercises read → build → PostImport wiring end-to-end against a
+// stub server: items are sent, Posted is set, and the server's {imported,books}
+// flows back into Outcome.Result.
+func TestRun_LivePostsAndReportsResult(t *testing.T) {
+	var gotItems int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/import/kobo" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		gotItems++
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"imported":2,"books":2}`))
+	}))
+	defer srv.Close()
+
+	out, err := Run(Options{
+		DBPath:  buildRunFixture(t),
+		BaseURL: srv.URL,
+		Token:   "sk_device_test",
+		DryRun:  false,
+	})
+	if err != nil {
+		t.Fatalf("Run live: %v", err)
+	}
+	if !out.Posted {
+		t.Fatal("Posted = false, want true on a live run with items")
+	}
+	if out.Result.Imported != 2 || out.Result.Books != 2 {
+		t.Fatalf("Result = %+v, want imported=2 books=2", out.Result)
+	}
+	if gotItems != 1 {
+		t.Fatalf("server hit %d times, want 1", gotItems)
+	}
+}
+
+// A server error on the live path must propagate out of Run, not be swallowed.
+func TestRun_LivePostErrorPropagates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error":"unauthorized","message":"Invalid device token"}`))
+	}))
+	defer srv.Close()
+
+	_, err := Run(Options{
+		DBPath:  buildRunFixture(t),
+		BaseURL: srv.URL,
+		Token:   "sk_device_bad",
+		DryRun:  false,
+	})
+	if err == nil {
+		t.Fatal("want error to propagate from Run on a 401, got nil")
 	}
 }

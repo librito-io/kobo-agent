@@ -231,6 +231,11 @@ func TestNormalizeISBN(t *testing.T) {
 		{"asin", "B0ABCD1234", ""},
 		// 13 chars but not all digits → rejected (X only legal in ISBN-10 terminal).
 		{"isbn13 with letter", "97805937X3746", ""},
+		// Non-ASCII must be cleanly rejected, never sliced mid-rune. A 9-digit
+		// prefix + a 2-byte rune is 11 bytes; under a naive byte-length check it
+		// could be mis-handled. Reject before length-switching.
+		{"isbn10 prefix plus multibyte rune", "123456789é", ""},
+		{"all multibyte", "ééééé", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
