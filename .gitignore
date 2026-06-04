@@ -1,0 +1,8 @@
+# Go workspace file is machine-local — do not commit (go convention).
+go.work
+go.work.sum
+
+# Compiled agent binaries (cross-compiled per-arch, not source).
+/dist/
+librito-kobo-agent
+*.test
