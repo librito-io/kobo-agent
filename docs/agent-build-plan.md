@@ -124,6 +124,53 @@ in the backend already (issues #286, #260).
   code, both fully centered with `-m -M`). The v1.25.0 release tag FAILED (wrong
   refresh ioctl — see caveat). → **Tier-2 dashboard viable (grayscale).**
 
+#### Step-2 probe — NickelDBus capability + WiFi control (hardware-verified 2026-06-06)
+
+Ahead of building Step 2, probed `qndb`'s full API (`qndb -a`) and tested the
+methods the pairing flow needs. **These are confirmed on the Libra Colour; design
+around them.**
+
+- **Dialog is fully scriptable for a live pairing flow — single-dialog UX works:**
+  - `dlgConfirmShow` is **non-blocking** — `qndb` returns immediately, so a Go/poll
+    loop keeps running while the dialog is up. (Reminder: `qndb` with NO `-m` hangs
+    on a signal — always pass a method.)
+  - A standing dialog **live-updates in place**: calling `dlgConfirmSetBody` /
+    `dlgConfirmSetTitle` after `dlgConfirmShow` changes the visible text with no
+    flicker/recreate. → one dialog can go "code 482 913" → "Paired ✓".
+  - `dlgConfirmClose` **closes it programmatically** (no user tap). The flow can
+    tear the dialog down itself on success.
+  - `dlgConfirmAcceptReject <title> <body> <acceptText> <rejectText>` shows **two
+    buttons**; the press is read via the `dlgConfirmResult <int>` signal —
+    **reject=0, accept=1** (verified), and tapping auto-dismisses. → a "Cancel"
+    button is detectable, so the user can abort pairing.
+  - ⚠️ **Don't fire dialog calls back-to-back** — a rapid create→show→update→close
+    burst raced and rendered nothing. Sequence with a small settle between calls.
+- **WiFi IS agent-controllable — but only the silent path; the non-silent path is
+  destructive:**
+  - `wfmConnectWirelessSilently` **drives the connect path with no UI**: invoking it
+    emits `wmTryingToConnect` then `wmNetworkConnected` (both verified firing). →
+    the agent can request WiFi and **wait on the `wmNetworkConnected` signal**
+    before talking to the network.
+  - 🛑 **`wfmConnectWireless` (non-silent) is forbidden in the agent.** It pops a
+    full-screen "looking for networks" → network-picker modal and **crashed Nickel
+    into a reboot** on hardware. Never call it. Same for `pwrReboot` as a recovery
+    step (a reboot watchdog cost us the dev SSH — dropbear isn't boot-persistent).
+  - **Two distinct WiFi states matter:** _disabled_ (radio off — airplane mode /
+    `nsForceWifi disable`) **cannot** be recovered by `wfmConnectWirelessSilently`;
+    _enabled-but-disconnected_ (radio on, just not associated — Nickel's natural
+    battery-timer drop) is the real-world state the agent faces. The silent connect
+    drives `wmTryingToConnect`/`wmNetworkConnected` from the enabled state; a clean
+    enabled→reassociate recovery test is still owed (do it silent-only, no
+    non-silent fallback, no reboot watchdog).
+  - Other present methods: `nsForceWifi <enable|disable>`, `wfmSetAirplaneMode`,
+    plus signals `wmNetworkConnected` / `wmNetworkDisconnected` / `wmWifiEnabled`
+    (fire on _change_, not queryable). `Kobo eReader.conf` is at
+    `/mnt/onboard/.kobo/Kobo/Kobo eReader.conf` (note the nested `Kobo/`).
+- **Device toolbox (verified absent):** no `jq`, no `uuidgen`, no `fbink` on a
+  stock-modded device; `qndb`, `wpa_cli`, `iwconfig` present. → the Step-1/2 agent
+  must be a **self-contained Go binary** (parse JSON, generate the UUID v4, do
+  HTTP in-process) — a shell+`jq` pairing script is not viable.
+
 #### Step-0 byproducts — the dev backbone (built en route, reuse for all later steps)
 
 Getting on-hardware required solving shell access + a WiFi-drop problem. These are
@@ -180,6 +227,8 @@ line) when convenient — low priority until the agent itself ships.
   `notes` invariant). Don't emit annotation counts the backend can't store.
 - Language: shell + `sqlite3` + `curl` + `jq` (all present or bundleable on Kobo),
   OR a small static ARM binary if shell gets unwieldy. Decide in-session.
+  → **Resolved: static Go binary.** `jq`/`uuidgen` are absent on device (Step-2
+  probe), and the pure-core/impure-edge split wanted real tests — see CLAUDE.md.
 - **Output:** a script that, given a token, syncs highlights end-to-end. Testable
   against the live endpoint with a real paired token.
 
@@ -187,11 +236,31 @@ line) when convenient — low priority until the agent itself ships.
 
 **Goal:** unpaired device → holds a valid token, no computer needed.
 
-- Implement the 3-call flow above as a shell script triggered by a NickelMenu item
-  ("Pair Librito"). Generate+persist `hardwareId` once.
-- Display the code via the Step-0 winner (NickelDBus dialog preferred, toast or
-  FBInk fallback). Poll status; on `paired:true` write token to the agent's config
-  dir. Show "Paired ✓".
+- Implement the 3-call flow above as a **`pair` subcommand of the Go agent**
+  (same binary, not a shell script — no `jq`/`uuidgen` on device; see the Step-2
+  probe), triggered by a NickelMenu item ("Pair Librito") via a thin launcher.
+- Generate+persist `hardwareId` once: **lowercase canonical UUID v4** from
+  `crypto/rand`. The web `hardware_id` UNIQUE is case-sensitive text — a
+  mixed-case resend would create a phantom second device. Persist to
+  `/mnt/onboard/.adds/librito/hardware-id`.
+- **Wire contract (verified against web):** `POST /api/pair/request {hardwareId}`
+  → `{code, pairingId, expiresIn:300, pollSecret}`. The `pollSecret` is returned
+  ONCE and **must** be sent as `Authorization: Bearer <pollSecret>` on every
+  status poll. `GET /api/pair/status/[pairingId]` → `{paired:false}` until the
+  user enters the code at `/app/devices`, then `{paired:true, token, userEmail}`.
+  Poll at ~5 s (server caps 1/3 s, fails open); code TTL 300 s; on `410` the code
+  expired → request a fresh one. The PaperS3 firmware (`src/cloud/PairingTask.cpp`)
+  is the working reference for this exact flow.
+- Display via the Step-2-verified **single live-updating NickelDBus dialog**: show
+  the code, live-update to "Paired ✓" on success, auto-close; a Cancel button
+  (`dlgConfirmAcceptReject` + `dlgConfirmResult`) aborts. On `paired:true` write
+  the token to `/mnt/onboard/.adds/librito/token`.
+- **WiFi:** before the first request, call `wfmConnectWirelessSilently` and wait
+  (bounded) for `wmNetworkConnected`; tolerate mid-poll drops by re-nudging
+  silently. **Never** `wfmConnectWireless` (non-silent) or `pwrReboot` — both are
+  destructive (see Step-2 probe).
+- **Prereq:** re-enable SSH auth (dropbear is passwordless for dev) before a real
+  token lands — do it before the first end-to-end on-device pairing run.
 - **Output:** tap-to-pair working on-device against the existing web flow.
 
 ### Step 3 — udev WiFi-up auto-sync trigger — **the robust backbone** ❓

@@ -86,6 +86,16 @@ Each looks wrong to someone who doesn't know the context. They are correct.
 6. **v1 is highlights-only.** Kobo annotations (`Bookmark.Annotation`) are NOT
    synced. This is currently a scope choice, not a permanent rule — see
    _Open questions_.
+7. **WiFi: silent path only — never the non-silent connect or a reboot.** The
+   agent may bring WiFi up via `qndb -m wfmConnectWirelessSilently` and wait on
+   the `wmNetworkConnected` signal. It must **never** call `wfmConnectWireless`
+   (non-silent) or `pwrReboot`: on hardware (2026-06-06) the non-silent method
+   popped a full-screen network-picker modal and **crashed Nickel into a reboot**,
+   and reboot-as-recovery kills the (non-boot-persistent) dev SSH. Note two WiFi
+   states: a _disabled_ radio can't be silently recovered, but the real-world
+   state the agent faces is _enabled-but-disconnected_ (Nickel's battery-timer
+   drop), which the silent path drives. Full probe results: `docs/agent-build-plan.md`
+   ("Step-2 probe").
 
 ## Build & test
 

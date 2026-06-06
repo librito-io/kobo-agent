@@ -9,3 +9,6 @@ librito-kobo-agent
 
 # branch-review tooling artifacts
 .claude/
+
+# Design specs and implementation plans (local only)
+docs/superpowers/
