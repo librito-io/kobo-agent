@@ -93,3 +93,8 @@ un-checkpointed WAL.
 
 Build plan + device facts: `librito-io/reader` `docs/kobo/agent-build-plan.md`.
 Import endpoint + wire contract: `librito-io/web` `src/lib/server/import/kobo.ts`.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). Contributions welcome — the
+agent is a device adapter, and more device adapters are the point.
