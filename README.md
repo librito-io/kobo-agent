@@ -91,10 +91,15 @@ un-checkpointed WAL.
 | 4    | —      | FBInk status dashboard                         |
 | 5    | —      | Mac installer app                              |
 
-Build plan + device facts: `librito-io/reader` `docs/kobo/agent-build-plan.md`.
+Build plan + device facts: [`docs/agent-build-plan.md`](docs/agent-build-plan.md).
+Install prerequisites (NickelDBus, NickelMenu): [`docs/install.md`](docs/install.md).
 Import endpoint + wire contract: `librito-io/web` `src/lib/server/import/kobo.ts`.
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE). Contributions welcome — the
-agent is a device adapter, and more device adapters are the point.
+Copyright 2026 Nathan Fushia.
+
+Licensed under the [GNU General Public License v3.0](LICENSE). This program is
+free software: you can redistribute it and/or modify it under the terms of the
+GPLv3. It is distributed WITHOUT ANY WARRANTY. Contributions welcome — the agent
+is a device adapter, and more device adapters are the point.
