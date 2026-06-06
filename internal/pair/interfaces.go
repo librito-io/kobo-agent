@@ -7,7 +7,10 @@ type PairRequest struct {
 	Code       string // 6-digit user-facing code
 	PairingID  string // path param for status polls
 	PollSecret string // Bearer on every status GET; returned once, never persisted
-	ExpiresIn  int    // seconds (server says 300); we bound by monotonic clock anyway
+	ExpiresIn  int    // server's stated TTL (seconds), recorded from the wire for
+	// completeness. NOT authoritative: the poll loop bounds code lifetime by the
+	// monotonic Clock against CodeTTL (the device wall clock is unreliable), so
+	// ExpiresIn is informational only.
 }
 
 // PairStatus is the result of a GET /api/pair/status/[pairingId] poll.

@@ -60,13 +60,16 @@ func runPair(argv []string) int {
 		DecisionWindow: 120 * time.Second, // time to tap Retry/Cancel on a No-WiFi / expired prompt
 	})
 
+	// Exit codes are a stable signal for a NickelMenu / udev wrapper: 0 ONLY when
+	// a token was written. Cancelled / expired / fatal are all distinct nonzero so
+	// a wrapper never mistakes "no token" for "paired".
 	switch res.Status {
 	case pair.ResultPaired:
 		fmt.Println("paired ✓")
 		return 0
 	case pair.ResultCancelled:
 		fmt.Fprintln(os.Stderr, "pairing cancelled")
-		return 0
+		return 3
 	case pair.ResultExpired:
 		fmt.Fprintln(os.Stderr, "pairing code expired")
 		return 1

@@ -13,22 +13,20 @@ type qndbWiFi struct{}
 // NewQndbWiFi builds the on-device WiFi driver.
 func NewQndbWiFi() WiFi { return &qndbWiFi{} }
 
-// Connect nudges WiFi up via the silent path and reports whether the device is
-// (now) usable. It returns true when the wmNetworkConnected signal fires within
-// the window OR when the nudge completes without the device telling us it's
-// disconnected.
+// Connect nudges WiFi up via the silent path and then ALWAYS proceeds — it
+// always returns true.
 //
-// Why optimistic-on-timeout: NickelDBus 0.2.0 exposes NO "are you connected?"
-// query — only connect/disconnect *signals* (verified on-HW 2026-06-06). When
-// WiFi is ALREADY connected (the common case — the user is on WiFi when they
-// pair), wfmConnectWirelessSilently changes nothing, so wmNetworkConnected never
-// fires and a strict signal-wait times out even though connectivity is fine.
-// Gating the pairing request on that signal made pairing fail for every
-// already-connected device. The HTTP request itself is the real connectivity
-// oracle: if the device is genuinely offline, /request transport-errors and the
-// poll loop surfaces that. So Connect only reports a hard failure when it sees
-// an explicit wmNetworkDisconnected / wmNetworkFailedToConnect signal within the
-// window; otherwise it proceeds.
+// Why always-optimistic: NickelDBus 0.2.0 exposes NO "are you connected?" query
+// — only connect/disconnect *signals* (verified on-HW 2026-06-06). When WiFi is
+// ALREADY connected (the common case — the user is on WiFi when they pair),
+// wfmConnectWirelessSilently changes nothing, so wmNetworkConnected never fires
+// and a strict signal-wait times out even though connectivity is fine. Gating
+// the pairing request on that signal made pairing fail for every already-
+// connected device. So Connect waits the window for wmNetworkConnected only to
+// let a freshly-connecting device settle, then proceeds regardless: the HTTP
+// /request is the real connectivity oracle — a genuinely-offline device
+// transport-errors there and the poll loop surfaces it. (Routing that transport
+// failure to a No-WiFi dialog is tracked as a followup.)
 func (qndbWiFi) Connect(timeout time.Duration) bool {
 	// Kick the silent connect (best-effort nudge; daemon-side, returns fast).
 	_ = exec.Command("qndb", "-m", "wfmConnectWirelessSilently").Run()
@@ -38,9 +36,18 @@ func (qndbWiFi) Connect(timeout time.Duration) bool {
 	// already-connected device fires no signal (verified on-HW), and /request is
 	// the real connectivity test — a genuinely-offline device transport-errors
 	// there and the poll loop surfaces it.
-	ms := strconv.Itoa(int(timeout / time.Millisecond))
-	_ = signalFires("wmNetworkConnected", ms)
+	_ = signalFires("wmNetworkConnected", millis(timeout))
 	return true
+}
+
+// millis renders a duration as the integer-millisecond string qndb's -t flag
+// expects (clamped at 0 so a negative timeout can't become a huge unsigned wait).
+func millis(d time.Duration) string {
+	ms := d / time.Millisecond
+	if ms < 0 {
+		ms = 0
+	}
+	return strconv.Itoa(int(ms))
 }
 
 // signalFires blocks on a single NickelDBus signal, self-bounded by qndb's -t

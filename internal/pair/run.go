@@ -31,7 +31,6 @@ const (
 // Result is what Run returns.
 type Result struct {
 	Status ResultStatus
-	Token  string // set on ResultPaired
 }
 
 // Run executes the pairing flow:
@@ -116,7 +115,7 @@ func pollLoop(d Deps, pr PairRequest, t0 time.Time) (Result, bool) {
 			}
 			d.Display.UpdatePaired(st.UserEmail)
 			d.Clock.Sleep(d.PollEvery) // let "Paired ✓" linger a beat before Close
-			return Result{Status: ResultPaired, Token: st.Token}, false
+			return Result{Status: ResultPaired}, false
 
 		case OutcomeWaiting:
 			d.Clock.Sleep(d.PollEvery)

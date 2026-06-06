@@ -18,7 +18,8 @@ const settleDelay = 150 * time.Millisecond
 type qndbDisplay struct {
 	mu       sync.Mutex
 	lastBtn  Button // latched from the dlgConfirmResult watcher
-	watching bool
+	watching bool   // a watcher goroutine is running
+	closed   bool   // Close() called → watcher loop should stop re-arming
 }
 
 // NewQndbDisplay builds the on-device Display.
@@ -59,6 +60,9 @@ func (d *qndbDisplay) UpdateError(msg string) {
 }
 
 func (d *qndbDisplay) Close() {
+	d.mu.Lock()
+	d.closed = true // stop the watcher loop from re-arming
+	d.mu.Unlock()
 	d.settle()
 	d.qndb("dlgConfirmClose")
 }
@@ -72,13 +76,19 @@ func (d *qndbDisplay) Poll() Button {
 	return b
 }
 
-// startResultWatcher launches a one-shot `qndb -s dlgConfirmResult` that blocks
-// until the user taps a button, then latches it. reject=0 → Cancel, accept=1 →
-// Retry (the only accept button we show post-code is Retry; the code dialog's
-// "OK" accept is harmless — the poll loop's cancel check ignores ButtonRetry).
+// startResultWatcher launches a single goroutine that watches `dlgConfirmResult`
+// for the dialog's whole lifetime, RE-ARMING after each tap. A one-shot watcher
+// would leave Cancel dead after the first tap: the dialog can be re-shown
+// (expired/no-wifi), and qndb Poll() returns ButtonNone until a fresh tap
+// latches — so without re-arming, a later Cancel would go undetected until TTL.
+// The loop exits when Close() sets `closed`.
+//
+// Button mapping: reject=0 → Cancel, accept=1 → Retry (the post-code accept is
+// always Retry; the code dialog's "OK" accept is harmless — the poll loop's
+// cancel check ignores ButtonRetry).
 func (d *qndbDisplay) startResultWatcher() {
 	d.mu.Lock()
-	if d.watching {
+	if d.watching || d.closed {
 		d.mu.Unlock()
 		return
 	}
@@ -86,19 +96,36 @@ func (d *qndbDisplay) startResultWatcher() {
 	d.mu.Unlock()
 
 	go func() {
-		out, err := exec.Command("qndb", "-s", "dlgConfirmResult").Output()
-		d.mu.Lock()
-		d.watching = false
-		if err == nil {
-			switch strings.TrimSpace(lastField(string(out))) {
-			case "0":
-				d.lastBtn = ButtonCancel
-			case "1":
-				d.lastBtn = ButtonRetry
+		for {
+			out, err := exec.Command("qndb", "-s", "dlgConfirmResult").Output()
+			d.mu.Lock()
+			if d.closed {
+				d.watching = false
+				d.mu.Unlock()
+				return
 			}
+			if err == nil {
+				if b := parseButton(string(out)); b != ButtonNone {
+					d.lastBtn = b
+				}
+			}
+			d.mu.Unlock()
 		}
-		d.mu.Unlock()
 	}()
+}
+
+// parseButton maps a `qndb -s dlgConfirmResult` line to a Button. qndb prints
+// the signal name then the int result; reject=0 → Cancel, accept=1 → Retry.
+// Anything else → ButtonNone (no tap registered).
+func parseButton(qndbOutput string) Button {
+	switch strings.TrimSpace(lastField(qndbOutput)) {
+	case "0":
+		return ButtonCancel
+	case "1":
+		return ButtonRetry
+	default:
+		return ButtonNone
+	}
 }
 
 func (d *qndbDisplay) qndb(method string, args ...string) {
