@@ -25,7 +25,7 @@ func TestClient_Request_ShapeAndOK(t *testing.T) {
 	defer srv.Close()
 
 	c := NewHTTPClient(srv.URL, 5*time.Second)
-	pr, out, _, err := c.Request("abababab-abab-4bab-8bab-abababababab")
+	pr, out, _, err := c.Request("abababab-abab-4bab-8bab-abababababab", "Kobo Libra Colour")
 	if err != nil {
 		t.Fatalf("Request: %v", err)
 	}
@@ -51,8 +51,36 @@ func TestClient_Request_ShapeAndOK(t *testing.T) {
 	if body["hardwareId"] != "abababab-abab-4bab-8bab-abababababab" {
 		t.Fatalf("hardwareId wrong: %s", gotBody)
 	}
-	if body["deviceType"] != "kobo" { // forward-compat field; web ignores it today
+	if body["deviceType"] != "kobo" { // closed set; non-"kobo" coerces to papers3 server-side
 		t.Fatalf("deviceType should be kobo: %s", gotBody)
+	}
+	if body["deviceModel"] != "Kobo Libra Colour" {
+		t.Fatalf("deviceModel should round-trip: %s", gotBody)
+	}
+}
+
+func TestClient_Request_EscapesModelWithQuotes(t *testing.T) {
+	// A model string with a quote/backslash must not break the JSON body —
+	// json.Marshal escapes it; a string-built body would 400 the pairing.
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"code":"1","pairingId":"p","pollSecret":"s","expiresIn":300}`))
+	}))
+	defer srv.Close()
+
+	model := `Kobo "Libra" \ Colour`
+	if _, out, _, err := NewHTTPClient(srv.URL, 5*time.Second).Request("id", model); err != nil || out != ReqOK {
+		t.Fatalf("Request: out=%v err=%v", out, err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal([]byte(gotBody), &body); err != nil {
+		t.Fatalf("body not valid JSON after escaping: %v (%s)", err, gotBody)
+	}
+	if body["deviceModel"] != model {
+		t.Fatalf("deviceModel not round-tripped: got %v", body["deviceModel"])
 	}
 }
 
@@ -64,7 +92,7 @@ func TestClient_Request_FatalAndTransient(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(tc.code)
 		}))
-		_, out, _, _ := NewHTTPClient(srv.URL, 5*time.Second).Request("id")
+		_, out, _, _ := NewHTTPClient(srv.URL, 5*time.Second).Request("id", "Kobo Libra Colour")
 		srv.Close()
 		if out != tc.want {
 			t.Fatalf("code %d → %v, want %v", tc.code, out, tc.want)

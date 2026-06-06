@@ -9,6 +9,7 @@ import (
 func deps(c *fakeClient, d *fakeDisplay, w *fakeWiFi, s *fakeStore, clk *fakeClock) Deps {
 	return Deps{
 		Client: c, Display: d, WiFi: w, Store: s, Clock: clk,
+		DeviceModel:    "Kobo Libra Colour",
 		WiFiTimeout:    20 * time.Second,
 		PollEvery:      5 * time.Second,
 		CodeTTL:        300 * time.Second,
@@ -44,6 +45,10 @@ func TestRun_HappyPath(t *testing.T) {
 		if sec != "ps-1" {
 			t.Fatalf("status call %d used pollSecret %q, want ps-1", i, sec)
 		}
+	}
+	// deviceModel from Deps threaded into the request.
+	if len(c.seenModels) != 1 || c.seenModels[0] != "Kobo Libra Colour" {
+		t.Fatalf("request deviceModel = %v, want [Kobo Libra Colour]", c.seenModels)
 	}
 }
 

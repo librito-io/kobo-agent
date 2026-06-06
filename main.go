@@ -36,7 +36,16 @@ func runPair(argv []string) int {
 	fs := flag.NewFlagSet("pair", flag.ExitOnError)
 	baseURL := fs.String("url", "https://librito.io", "Librito API base URL")
 	dir := fs.String("dir", adsDir, "directory for hardware-id + token files")
+	model := fs.String("model", "", "override the device model sent on pairing (default: detect from the Kobo version file)")
+	versionPath := fs.String("version-file", pair.DefaultVersionPath, "path to the Kobo version file used to detect the model")
 	_ = fs.Parse(argv)
+
+	// Model precedence: --model override > detected from the version file >
+	// legible fallback (DetectModel never errors; it degrades to "Kobo").
+	deviceModel := *model
+	if deviceModel == "" {
+		deviceModel = pair.DetectModel(*versionPath)
+	}
 
 	res := pair.Run(pair.Deps{
 		Client:         pair.NewHTTPClient(*baseURL, 30*time.Second),
@@ -44,6 +53,7 @@ func runPair(argv []string) int {
 		WiFi:           pair.NewQndbWiFi(),
 		Store:          pair.NewFileStore(*dir, rand.Reader),
 		Clock:          realClock{},
+		DeviceModel:    deviceModel,
 		WiFiTimeout:    20 * time.Second,
 		PollEvery:      5 * time.Second,
 		CodeTTL:        300 * time.Second,

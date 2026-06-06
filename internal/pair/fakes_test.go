@@ -111,12 +111,17 @@ type fakeClient struct {
 	statusCalls int
 	// records pollSecret seen on each status call, to assert it's threaded.
 	seenSecrets []string
+	// records (hardwareID, deviceModel) seen on each request call.
+	seenHWIDs  []string
+	seenModels []string
 }
 
-func (c *fakeClient) Request(hardwareID string) (PairRequest, RequestOutcome, time.Duration, error) {
+func (c *fakeClient) Request(hardwareID, deviceModel string) (PairRequest, RequestOutcome, time.Duration, error) {
 	if len(c.reqSteps) == 0 {
 		panic("fakeClient.Request called but reqSteps is empty (test wired no request)")
 	}
+	c.seenHWIDs = append(c.seenHWIDs, hardwareID)
+	c.seenModels = append(c.seenModels, deviceModel)
 	s := c.reqSteps[min(c.reqCalls, len(c.reqSteps)-1)]
 	c.reqCalls++
 	return s.pr, s.out, s.ra, nil

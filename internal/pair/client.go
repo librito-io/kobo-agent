@@ -31,10 +31,13 @@ func NewHTTPClient(baseURL string, timeout time.Duration) Client {
 	}
 }
 
-func (c *httpClient) Request(hardwareID string) (PairRequest, RequestOutcome, time.Duration, error) {
+func (c *httpClient) Request(hardwareID, deviceModel string) (PairRequest, RequestOutcome, time.Duration, error) {
+	// json.Marshal escapes deviceModel automatically (a quote/backslash in a
+	// model name would otherwise 400 the whole pairing — see web handoff).
 	body, _ := json.Marshal(map[string]string{
-		"hardwareId": hardwareID,
-		"deviceType": "kobo", // forward-compat; web ignores it today (web devices.type issue)
+		"hardwareId":  hardwareID,
+		"deviceType":  "kobo", // closed set papers3|kobo|kindle; anything else silently coerced to papers3 server-side
+		"deviceModel": deviceModel,
 	})
 	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/api/pair/request", bytes.NewReader(body))
 	if err != nil {

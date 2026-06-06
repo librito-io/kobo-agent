@@ -49,9 +49,10 @@ const (
 
 // Client talks to the pairing API. The httptest-mocked impl lives in client.go.
 type Client interface {
-	// Request POSTs {hardwareId, deviceType:"kobo"}. The RequestOutcome tells the
-	// caller how to react; retryAfter is the server's Retry-After (0 if absent).
-	Request(hardwareID string) (req PairRequest, out RequestOutcome, retryAfter time.Duration, err error)
+	// Request POSTs {hardwareId, deviceType:"kobo", deviceModel}. The
+	// RequestOutcome tells the caller how to react; retryAfter is the server's
+	// Retry-After (0 if absent).
+	Request(hardwareID, deviceModel string) (req PairRequest, out RequestOutcome, retryAfter time.Duration, err error)
 	// Status GETs status/[pairingId] with Bearer pollSecret on EVERY call.
 	Status(pairingID, pollSecret string) (st PairStatus, out PollOutcome, retryAfter time.Duration, err error)
 }
@@ -75,6 +76,8 @@ type WiFi interface {
 	// MUST NOT ever call the non-silent path or reboot.
 	Connect(timeout time.Duration) (connected bool)
 }
+
+// (DeviceModel is plumbed via Deps, not Store — it is detected fresh per run.)
 
 // Store persists the two on-disk files under /mnt/onboard/.adds/librito/.
 type Store interface {

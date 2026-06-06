@@ -10,6 +10,7 @@ type Deps struct {
 	Store   Store
 	Clock   Clock
 
+	DeviceModel    string        // human-legible model sent on every pair request (devices.model)
 	WiFiTimeout    time.Duration // bounded wait for wmNetworkConnected (~20s)
 	PollEvery      time.Duration // status poll cadence (~5s)
 	CodeTTL        time.Duration // monotonic lifetime of a code (300s)
@@ -65,7 +66,7 @@ func Run(d Deps) Result {
 
 	// request → poll, with 410-Retry re-entering request.
 	for {
-		pr, reqOut, reqRA, _ := d.Client.Request(hwid)
+		pr, reqOut, reqRA, _ := d.Client.Request(hwid, d.DeviceModel)
 		switch reqOut {
 		case ReqOK:
 			// fall through to poll
