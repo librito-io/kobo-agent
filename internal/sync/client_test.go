@@ -31,7 +31,7 @@ func TestPostImport_RequestShapeAndResponse(t *testing.T) {
 		gotBody = string(b)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		w.Write([]byte(`{"imported":1,"books":1}`))
+		_, _ = w.Write([]byte(`{"imported":1,"books":1}`))
 	}))
 	defer srv.Close()
 
@@ -66,7 +66,7 @@ func TestPostImport_RequestShapeAndResponse(t *testing.T) {
 func TestPostImport_ErrorStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
-		w.Write([]byte(`{"error":"unauthorized","message":"Invalid device token"}`))
+		_, _ = w.Write([]byte(`{"error":"unauthorized","message":"Invalid device token"}`))
 	}))
 	defer srv.Close()
 

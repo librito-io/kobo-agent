@@ -58,7 +58,7 @@ func PostImport(baseURL, token string, items []transform.KoboImportItem) (Import
 	if err != nil {
 		return ImportResult{}, fmt.Errorf("post import: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
