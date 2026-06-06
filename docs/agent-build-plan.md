@@ -268,9 +268,31 @@ line) when convenient — low priority until the agent itself ships.
 - **Output:** a script that, given a token, syncs highlights end-to-end. Testable
   against the live endpoint with a real paired token.
 
-### Step 2 — On-device pairing
+### Step 2 — On-device pairing — ✅ DONE 2026-06-06 (hardware-verified)
 
 **Goal:** unpaired device → holds a valid token, no computer needed.
+
+**Status: shipped** (PR #9). The `internal/pair` package implements the 3-call
+flow as a `pair` subcommand; `main.go` dispatches `os.Args[1]=="pair"` else sync.
+Hardware-verified end-to-end on the Libra Colour: code → claim at `/app/devices`
+→ `paired ✓` → token written → sync round-trip (idempotent), with
+`devices.type=kobo` + `devices.model="Kobo Libra Colour"` (the agent detects the
+model from `/mnt/onboard/.kobo/version` and sends `deviceType`/`deviceModel`).
+The implementation notes + HW-tuned values live in the **Step-2 implementation**
+section above; the design/plan are local-only under `docs/superpowers/`.
+
+What deviated from the bullets below (all corrected in-flight):
+
+- **WiFi gate** — the bounded `wmNetworkConnected` wait fails for an ALREADY-
+  connected device (NickelDBus 0.2.0 fires that signal only on a state _change_,
+  and has no connection-state query). `Connect` now nudges silently then proceeds;
+  the HTTP `/request` is the real connectivity oracle. Silent-path-only invariant
+  intact. See the WiFi correction in the Step-2 implementation section.
+- **Open follow-ups (GitHub issues, Feature / area:pairing):** #3 flip the menu
+  item to Unpair once paired (+ confirm modal); #4 route a request transport-
+  failure to the No-WiFi dialog (now unreachable since `Connect` always proceeds).
+- **Prereq still standing:** SSH hardening gates the first PRODUCTION-token run
+  (Step 5). Dev verification used local web + throwaway tokens, so it didn't block.
 
 - Implement the 3-call flow above as a **`pair` subcommand of the Go agent**
   (same binary, not a shell script — no `jq`/`uuidgen` on device; see the Step-2
