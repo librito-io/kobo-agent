@@ -20,7 +20,7 @@ func TestClient_Request_ShapeAndOK(t *testing.T) {
 		gotBody = string(b)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		w.Write([]byte(`{"code":"482913","pairingId":"pid-1","pollSecret":"ps-1","expiresIn":300}`))
+		_, _ = w.Write([]byte(`{"code":"482913","pairingId":"pid-1","pollSecret":"ps-1","expiresIn":300}`))
 	}))
 	defer srv.Close()
 
@@ -67,7 +67,7 @@ func TestClient_Request_EscapesModelWithQuotes(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"code":"1","pairingId":"p","pollSecret":"s","expiresIn":300}`))
+		_, _ = w.Write([]byte(`{"code":"1","pairingId":"p","pollSecret":"s","expiresIn":300}`))
 	}))
 	defer srv.Close()
 
@@ -107,7 +107,7 @@ func TestClient_Status_BearerAndPaired(t *testing.T) {
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		w.Write([]byte(`{"paired":true,"token":"sk_device_abc","userEmail":"a@b.co"}`))
+		_, _ = w.Write([]byte(`{"paired":true,"token":"sk_device_abc","userEmail":"a@b.co"}`))
 	}))
 	defer srv.Close()
 
@@ -139,7 +139,7 @@ func TestClient_Status_WaitingExpiredFatal(t *testing.T) {
 	} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(tc.code)
-			w.Write([]byte(tc.body))
+			_, _ = w.Write([]byte(tc.body))
 		}))
 		_, out, _, _ := NewHTTPClient(srv.URL, 5*time.Second).Status("pid", "ps")
 		srv.Close()

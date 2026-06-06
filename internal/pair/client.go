@@ -49,7 +49,7 @@ func (c *httpClient) Request(hardwareID, deviceModel string) (PairRequest, Reque
 	if err != nil {
 		return PairRequest{}, ClassifyRequest(0, true), 0, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	ra := parseRetryAfter(resp.Header.Get("Retry-After"))
 
 	out := ClassifyRequest(resp.StatusCode, false)
@@ -79,7 +79,7 @@ func (c *httpClient) Status(pairingID, pollSecret string) (PairStatus, PollOutco
 	if err != nil {
 		return PairStatus{}, ClassifyStatus(0, false, true), 0, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	ra := parseRetryAfter(resp.Header.Get("Retry-After"))
 
 	if resp.StatusCode != 200 {
