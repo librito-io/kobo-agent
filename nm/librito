@@ -1,0 +1,14 @@
+# Librito NickelMenu config — copy to /mnt/onboard/.adds/nm/librito
+#
+# Relabels the NickelMenu bottom-bar tab to "Librito" (hardware-verified on
+# Nickel 4.45). A `main`-location tab opens a submenu; Step 2 ships the "Pair"
+# item. "Sync now" / "Status" are added in Steps 3-4.
+#
+# WARNING: `experimental:` directives are flagged by NickelMenu as possibly
+# unstable across versions. Pin to the tested NickelMenu version (v0.6.0) and
+# re-verify after any NickelMenu or firmware update. The menu item id (15505)
+# is from the spec's verified example — confirm the live id on-device (Task 11).
+
+experimental :menu_main_15505_label :Librito
+
+menu_item :main :Pair Librito :cmd_spawn :quiet :/mnt/onboard/.adds/librito/agent pair
