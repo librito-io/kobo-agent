@@ -9,9 +9,10 @@ import (
 func deps(c *fakeClient, d *fakeDisplay, w *fakeWiFi, s *fakeStore, clk *fakeClock) Deps {
 	return Deps{
 		Client: c, Display: d, WiFi: w, Store: s, Clock: clk,
-		WiFiTimeout: 20 * time.Second,
-		PollEvery:   5 * time.Second,
-		CodeTTL:     300 * time.Second,
+		WiFiTimeout:    20 * time.Second,
+		PollEvery:      5 * time.Second,
+		CodeTTL:        300 * time.Second,
+		DecisionWindow: 60 * time.Second, // match production intent (not the CodeTTL fallback)
 	}
 }
 

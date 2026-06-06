@@ -3,11 +3,17 @@ package pair
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// maxBody bounds how much of a response we read into memory — the device is
+// memory-constrained, and both endpoints are our own backend returning tiny
+// JSON. Matches internal/sync/client.go's 64 KiB cap.
+const maxBody = 64 * 1024
 
 // httpClient is the impure Client edge. Like internal/sync, it relies on Go's
 // own TLS stack + CA roots, not the Kobo's stale system store.
@@ -53,7 +59,7 @@ func (c *httpClient) Request(hardwareID string) (PairRequest, RequestOutcome, ti
 		PollSecret string `json:"pollSecret"`
 		ExpiresIn  int    `json:"expiresIn"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&pr); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&pr); err != nil {
 		return PairRequest{}, ReqTransient, ra, nil // unparseable 200 → treat as transient
 	}
 	return PairRequest{Code: pr.Code, PairingID: pr.PairingID, PollSecret: pr.PollSecret, ExpiresIn: pr.ExpiresIn}, ReqOK, ra, nil
@@ -81,7 +87,7 @@ func (c *httpClient) Status(pairingID, pollSecret string) (PairStatus, PollOutco
 		Token     string `json:"token"`
 		UserEmail string `json:"userEmail"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&st); err != nil {
 		return PairStatus{}, OutcomeTransient, ra, nil
 	}
 	ps := PairStatus{Paired: st.Paired, Token: st.Token, UserEmail: st.UserEmail}
