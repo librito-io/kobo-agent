@@ -52,8 +52,12 @@ jobs:
           go-version-file: go.mod
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          # No .golangci.yml — start with the action's default linter set.
-          # Add a config file later only if defaults prove too noisy.
-          version: latest
+          # Pin golangci-lint v2 explicitly — the action's `latest` tag still
+          # resolves to a v1.x binary built with an older Go that refuses a
+          # go1.26 target ("Go language version used to build golangci-lint is
+          # lower than the targeted Go version"). v2 is built with current Go.
+          # No .golangci.yml — v2 default linter set applies; add a config
+          # later only if defaults prove too noisy.
+          version: v2.12.2
