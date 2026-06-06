@@ -4,11 +4,10 @@ On-device Go agent that reads stock-Nickel highlights from a Kobo e-reader and
 syncs them to the Librito web backend. **Work in progress** — Step 1 (the sync
 core) is done and hardware-verified; Steps 2–5 are not built yet (see _Roadmap_).
 
-> **This repo is local-only for now.** A GitHub repo under `librito-io` is
-> planned but not created. Do not push to a remote without the user's explicit
-> go-ahead. The repo's open-source status is undecided and intentionally
-> deferred (it interacts with the web app's undecided open-source decision) —
-> assume it _may_ become public, so keep personal data out (see _Fixtures_).
+> **This is a public repo** (`librito-io/kobo-agent`, GPLv3). Keep personal
+> data out of fixtures and commits (see _Fixtures_). Do not push to a remote
+> without the user's explicit go-ahead — pause between commit and any remote
+> action.
 
 ## The three Librito repos
 
@@ -159,10 +158,59 @@ read as fact.
 
 ## Conventions
 
-- Go standard style; `gofmt` clean, `go vet` clean before commit.
+- Go standard style; `gofmt` clean, `go vet` clean before commit. CI
+  (`.github/workflows/ci.yml`) gates build/test/vet/`gofmt`/golangci-lint on
+  every PR.
 - **TDD** for new behavior: failing test first, watch it fail, minimal pass.
   The pure transforms especially — every edge case is a test row.
-- **Conventional Commits** (`feat(agent):`, `fix(agent):`, …), matching the
-  Librito convention. Commit messages are the durable archeology.
-- **Never push to a remote, or create the GitHub repo, without explicit
-  go-ahead.** Pause between commit and any remote action.
+- **Never push to a remote without explicit go-ahead.** Pause between commit
+  and any remote action.
+
+### PR & Commit Convention
+
+Squash-merge default. The squash body concatenates the branch's commit messages
+(`COMMIT_MESSAGES`), so **commit messages are the durable archeology**, not the
+PR body.
+
+- **Conventional Commits** for commit AND PR titles: `feat(scope):` `fix(scope):`
+  `bug(scope):` `chore(scope):` `docs(scope):` `test(scope):` `perf(scope):`
+  `refactor(scope):`. `bug` = user-facing defect fix, distinct from `fix`
+  (internal regression). Scope is optional and free-form; a package name
+  (`sync`, `transform`, `pair`, `kobo`) or `agent` are common.
+- **Enforcement is CI-only** — this is a Go repo with no Node runtime, so there
+  is no local husky hook (unlike `librito-io/web`).
+  `.github/workflows/commitlint.yml` lints every commit in a PR;
+  `.github/workflows/lint-pr-title.yml` gates the PR title. Both use the type
+  list above; rules live in `commitlint.config.mjs`.
+- **Subject ≤100 chars hard** (commitlint). Soft targets: ≤50 ideal, ≤72
+  preferred. Body line length is not capped.
+- **PR body** = ephemeral reviewer surface (summary + test plan). Do not
+  duplicate commit-message archeology into it.
+- Never use `--no-verify`.
+
+### Issue tracking
+
+All work is tracked in GitHub Issues on the shared org Project board
+("Librito", `https://github.com/orgs/librito-io/projects/1`) spanning `web`,
+`reader`, and `kobo-agent`. Issues opened from the templates auto-add to it.
+
+- **File immediately** for incidental finds during a primary task — do not stash
+  them in markdown trackers, and do not create follow-up `.md` docs.
+- **Title:** imperative summary, no Conventional-Commits prefix. Type is set via
+  the GitHub-native Issue Type field (`Bug` / `Feature` / `Chore` / `Docs`),
+  area via an `area:*` label.
+- **CLI flow** (older `gh` has no `--type` flag):
+  ```bash
+  ISSUE_URL=$(gh issue create --repo librito-io/kobo-agent --title "..." --label "area:sync" --body "...")
+  gh api repos/librito-io/kobo-agent/issues/${ISSUE_URL##*/} -F type=Chore --silent
+  ```
+- **Body:** four `##` sections in order — `## Problem`, `## Solution` (mark
+  `_unknown_` for bugs without a known fix), `## Discovery` (link the PR),
+  `## Acceptance`.
+- **Area labels:** `area:sync` `area:transform` `area:kobo` `area:pairing`
+  `area:ui` `area:install` `area:build` `area:ci` `area:docs`.
+- **Status labels:** `needs-triage` (auto-applied unless type + area both set,
+  removed on triage), `blocked` (external dep + comment naming it), `deferred`
+  (revival trigger documented in body, else close).
+- **Cross-repo:** if work spans repos, file one issue per repo and cross-link
+  the bodies; don't combine.
