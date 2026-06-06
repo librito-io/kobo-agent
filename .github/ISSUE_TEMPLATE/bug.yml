@@ -1,0 +1,63 @@
+name: Agent bug
+description: Defect in the kobo-agent sync, transform, pairing, or on-device UI
+type: "Bug"
+labels: ["needs-triage"]
+projects: ["librito-io/1"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What's wrong? Expected vs actual.
+      placeholder: |
+        When the agent runs X, Y happens.
+        I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Pair the device
+        2. Add a highlight in a book
+        3. Run `agent sync`
+        4. ...
+    validations:
+      required: true
+
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent version / build
+      placeholder: "git sha or dist build date"
+
+  - type: input
+    id: device
+    attributes:
+      label: Kobo device + firmware
+      placeholder: "Libra Colour / Nickel 4.45.23697"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Agent log output
+      description: Paste relevant stdout / syslog from the agent run
+      render: shell
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Proposed fix (if known)
+      description: Optional. If you have a hypothesis or know the fix.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] X no longer happens
+        - [ ] Y syncs correctly
+    validations:
+      required: true
