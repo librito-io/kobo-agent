@@ -1,0 +1,35 @@
+name: commitlint
+
+# Lints every commit in the PR against commitlint.config.mjs. This Go repo has
+# no local husky hook, so this CI job is the only commit-message-shape gate.
+# Pairs with lint-pr-title.yml which gates the PR title separately via
+# amannn/action-semantic-pull-request.
+#
+# Convention + rationale: CLAUDE.md → "PR & Commit Convention".
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # commitlint needs the full PR commit range to lint each commit.
+          fetch-depth: 0
+
+      - name: Lint commit messages
+        uses: wagoid/commitlint-github-action@v6
+        with:
+          # Must be .mjs — wagoid v6 rejects .js (and our config uses
+          # `export default` which is ESM regardless).
+          configFile: commitlint.config.mjs
+          failOnWarnings: false
+          helpURL: https://github.com/librito-io/kobo-agent/blob/main/CLAUDE.md#pr--commit-convention
