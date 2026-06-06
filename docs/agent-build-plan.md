@@ -171,6 +171,42 @@ around them.**
   must be a **self-contained Go binary** (parse JSON, generate the UUID v4, do
   HTTP in-process) — a shell+`jq` pairing script is not viable.
 
+#### Step-2 implementation — end-to-end pairing verified on hardware (2026-06-06)
+
+The `pair` subcommand pairs a Libra Colour against local web with no computer
+touching the device. Verified live: code shown → claimed at `/app/devices` →
+token written → `devices.{type=kobo, model="Kobo Libra Colour"}` set. Then plain
+`agent` (no `--token`) picks up the token file and dry-run reads 6 highlights.
+
+HW-tuned / HW-corrected values:
+
+- **`settleDelay = 150 ms`** between qndb dialog calls renders reliably (the
+  AcceptReject→SetBody→Close sequence rendered cleanly). Not lowered further;
+  150 ms is the shipped value.
+- **Model detection:** `/mnt/onboard/.kobo/version` is **6 CSV fields**; field 6
+  is a zero-padded UUID whose trailing decimal is the Kobo device id. Real dump:
+  `N…,4.9.77,4.45.23697,4.9.77,4.9.77,00000000-0000-0000-0000-000000000390` →
+  id `390` → `"Kobo Libra Colour"`. Parser pinned to this layout
+  (`internal/pair/model.go`).
+- 🛑 **WiFi signal correction — supersedes the Step-2 probe's claim that
+  `wfmConnectWirelessSilently` "emits `wmNetworkConnected`".** That only holds
+  from a _disconnected_ state. When WiFi is **already connected** (the common
+  case — the user is on WiFi when they pair), the silent connect changes nothing
+  and **`wmNetworkConnected` never fires**; a strict signal-wait times out, which
+  made the first hardware run fail with "pairing cancelled" before any `/request`.
+  NickelDBus 0.2.0 has **no connection-state query method** (introspected:
+  only connect/disconnect _signals_, no getter). **Fix:** `WiFi.Connect` now
+  nudges via the silent path, waits the window for `wmNetworkConnected` as a
+  courtesy, then **proceeds regardless** — the `/request` HTTP call is the real
+  connectivity oracle. qndb signal-wait exit code is the fire/timeout signal
+  (rc 0 = fired, non-zero = timeout); stdout stays empty either way.
+  - **Known follow-up:** with `Connect` always proceeding, the No-WiFi
+    Retry/Cancel dialog is now unreachable on the real impl — a genuinely-offline
+    device instead transport-errors at `/request` → `ReqTransient` → TTL-bounded
+    backoff (bounded, not a spin, but no dedicated dialog). Wiring transport
+    failure to a No-WiFi outcome is deferred (not blocking; the state-machine
+    tests still cover the dialog logic via the fake).
+
 #### Step-0 byproducts — the dev backbone (built en route, reuse for all later steps)
 
 Getting on-hardware required solving shell access + a WiFi-drop problem. These are
