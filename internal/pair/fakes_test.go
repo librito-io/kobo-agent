@@ -114,11 +114,17 @@ type fakeClient struct {
 }
 
 func (c *fakeClient) Request(hardwareID string) (PairRequest, RequestOutcome, time.Duration, error) {
+	if len(c.reqSteps) == 0 {
+		panic("fakeClient.Request called but reqSteps is empty (test wired no request)")
+	}
 	s := c.reqSteps[min(c.reqCalls, len(c.reqSteps)-1)]
 	c.reqCalls++
 	return s.pr, s.out, s.ra, nil
 }
 func (c *fakeClient) Status(pairingID, pollSecret string) (PairStatus, PollOutcome, time.Duration, error) {
+	if len(c.statusSteps) == 0 {
+		panic("fakeClient.Status called but statusSteps is empty (test wired no status)")
+	}
 	c.seenSecrets = append(c.seenSecrets, pollSecret)
 	s := c.statusSteps[min(c.statusCalls, len(c.statusSteps)-1)]
 	c.statusCalls++
