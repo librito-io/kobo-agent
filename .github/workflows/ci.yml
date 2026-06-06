@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Pin to the version declared in go.mod (currently 1.26.4) so CI and
+          # local stay in lockstep without editing this file on every bump.
+          go-version-file: go.mod
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [[ -n "$unformatted" ]]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          # Pin golangci-lint v2 explicitly — the action's `latest` tag still
+          # resolves to a v1.x binary built with an older Go that refuses a
+          # go1.26 target ("Go language version used to build golangci-lint is
+          # lower than the targeted Go version"). v2 is built with current Go.
+          # No .golangci.yml — v2 default linter set applies; add a config
+          # later only if defaults prove too noisy.
+          version: v2.12.2

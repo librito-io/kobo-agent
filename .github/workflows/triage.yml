@@ -1,0 +1,29 @@
+name: Issue triage label
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  needs-triage:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.issue.labels.*.name, 'needs-triage') }}
+    steps:
+      - name: Stamp needs-triage if not fully tagged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          HAS_TYPE: ${{ github.event.issue.type != null }}
+          LABELS_JSON: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          has_area=$(jq -r 'map(select(startswith("area:"))) | length' <<<"$LABELS_JSON")
+          if [[ "$HAS_TYPE" == "true" && "$has_area" -gt 0 ]]; then
+            echo "Already tagged (type + area) — skipping needs-triage."
+            exit 0
+          fi
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "needs-triage"
