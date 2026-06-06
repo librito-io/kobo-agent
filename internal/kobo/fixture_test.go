@@ -94,7 +94,7 @@ func writeFixtureDBAt(t *testing.T, path string, rows []fixtureRow) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	for _, stmt := range []string{
 		`CREATE TABLE content (ContentID TEXT PRIMARY KEY, ContentType TEXT, Title TEXT, Attribution TEXT, ISBN TEXT)`,

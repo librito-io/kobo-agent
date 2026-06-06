@@ -20,7 +20,7 @@ func buildRunFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	for _, stmt := range []string{
 		`CREATE TABLE content (ContentID TEXT PRIMARY KEY, ContentType TEXT, Title TEXT, Attribution TEXT, ISBN TEXT)`,
 		`CREATE TABLE Bookmark (BookmarkID TEXT PRIMARY KEY, VolumeID TEXT, ContentID TEXT, Text TEXT, Annotation TEXT, DateCreated TEXT, Hidden TEXT, Type TEXT)`,
@@ -81,7 +81,7 @@ func TestRun_LivePostsAndReportsResult(t *testing.T) {
 		}
 		gotItems++
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"imported":2,"books":2}`))
+		_, _ = w.Write([]byte(`{"imported":2,"books":2}`))
 	}))
 	defer srv.Close()
 
@@ -109,7 +109,7 @@ func TestRun_LivePostsAndReportsResult(t *testing.T) {
 func TestRun_LivePostErrorPropagates(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
-		w.Write([]byte(`{"error":"unauthorized","message":"Invalid device token"}`))
+		_, _ = w.Write([]byte(`{"error":"unauthorized","message":"Invalid device token"}`))
 	}))
 	defer srv.Close()
 

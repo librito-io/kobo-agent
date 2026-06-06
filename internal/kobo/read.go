@@ -47,36 +47,43 @@ ORDER BY c.Title, b.DateCreated`
 // Nickel has written to the WAL but not yet checkpointed into the main file —
 // the agent must never read a stale pre-checkpoint snapshot. `mode=ro` keeps
 // the agent from mutating the user's DB or forcing a checkpoint.
-func ReadHighlights(path string) ([]RawBookmark, error) {
+func ReadHighlights(path string) (out []RawBookmark, err error) {
 	// Escape the path so URI-special chars in it (# truncating as a fragment,
 	// ?/& injecting DSN params that could override mode=ro) are encoded as path
 	// data rather than interpreted. mode=ro is appended as a real query param.
 	dsn := "file:" + url.PathEscape(path) + "?mode=ro"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open kobo db: %w", err)
+	db, openErr := sql.Open("sqlite", dsn)
+	if openErr != nil {
+		return nil, fmt.Errorf("open kobo db: %w", openErr)
 	}
-	defer db.Close()
+	defer func() {
+		if cerr := db.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close kobo db: %w", cerr)
+		}
+	}()
 
-	rows, err := db.Query(readQuery)
-	if err != nil {
-		return nil, fmt.Errorf("query highlights: %w", err)
+	rows, queryErr := db.Query(readQuery)
+	if queryErr != nil {
+		return nil, fmt.Errorf("query highlights: %w", queryErr)
 	}
-	defer rows.Close()
+	defer func() {
+		if cerr := rows.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close rows: %w", cerr)
+		}
+	}()
 
-	var out []RawBookmark
 	for rows.Next() {
 		var r RawBookmark
-		if err := rows.Scan(
+		if scanErr := rows.Scan(
 			&r.BookmarkID, &r.VolumeID, &r.Text, &r.DateCreated,
 			&r.Title, &r.Attribution, &r.ISBN, &r.ChapterTitle,
-		); err != nil {
-			return nil, fmt.Errorf("scan highlight: %w", err)
+		); scanErr != nil {
+			return nil, fmt.Errorf("scan highlight: %w", scanErr)
 		}
 		out = append(out, r)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate highlights: %w", err)
+	if iterErr := rows.Err(); iterErr != nil {
+		return nil, fmt.Errorf("iterate highlights: %w", iterErr)
 	}
 	return out, nil
 }
