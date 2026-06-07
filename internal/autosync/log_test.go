@@ -12,31 +12,42 @@ func TestFormatLine(t *testing.T) {
 	cases := []struct {
 		name string
 		t    time.Time
+		tag  string
 		msg  string
 		want string
 	}{
 		{
 			"success",
 			ts,
+			"autosync",
 			"imported 6 across 6 books",
 			"2026-06-07T19:42:00Z autosync: imported 6 across 6 books\n",
 		},
 		{
 			"error",
 			ts,
+			"autosync",
 			"post import: dial tcp: timeout",
 			"2026-06-07T19:42:00Z autosync: post import: dial tcp: timeout\n",
 		},
 		{
 			"non-utc input is converted to UTC",
 			time.Date(2026, 6, 7, 20, 42, 0, 0, time.FixedZone("BST", 3600)),
+			"autosync",
 			"skipped: not paired",
 			"2026-06-07T19:42:00Z autosync: skipped: not paired\n",
+		},
+		{
+			"watch tag",
+			ts,
+			"watch",
+			"signature grew 7→8",
+			"2026-06-07T19:42:00Z watch: signature grew 7→8\n",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := FormatLine(c.t, c.msg); got != c.want {
+			if got := FormatLine(c.t, c.tag, c.msg); got != c.want {
 				t.Fatalf("FormatLine = %q, want %q", got, c.want)
 			}
 		})
@@ -71,7 +82,7 @@ func TestFileLogger_AppendsAndCaps(t *testing.T) {
 	l := NewFileLogger(path, 200)
 
 	for i := 0; i < 50; i++ {
-		l.Log(FormatLine(time.Date(2026, 6, 7, 19, 42, i%60, 0, time.UTC), "imported 6 across 6 books"))
+		l.Log(FormatLine(time.Date(2026, 6, 7, 19, 42, i%60, 0, time.UTC), "autosync", "imported 6 across 6 books"))
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
