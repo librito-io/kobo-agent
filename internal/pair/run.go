@@ -11,6 +11,7 @@ type Deps struct {
 	Clock   Clock
 
 	DeviceModel    string        // human-legible model sent on every pair request (devices.model)
+	BaseURL        string        // backend the device paired against; persisted for autosync (Step 3)
 	WiFiTimeout    time.Duration // bounded wait for wmNetworkConnected (~20s)
 	PollEvery      time.Duration // status poll cadence (~5s)
 	CodeTTL        time.Duration // monotonic lifetime of a code (300s)
@@ -109,6 +110,13 @@ func pollLoop(d Deps, pr PairRequest, t0 time.Time) (Result, bool) {
 		st, out, ra, _ := d.Client.Status(pr.PairingID, pr.PollSecret)
 		switch out {
 		case OutcomePaired:
+			// Persist the paired backend URL BEFORE the token: a paired device
+			// (token present) is then guaranteed to also have the url file, and a
+			// url-write failure aborts before any token is written (Step 3 coupling).
+			if err := d.Store.WriteURL(d.BaseURL); err != nil {
+				d.Display.UpdateError("could not save backend")
+				return Result{Status: ResultFatal}, false
+			}
 			if err := d.Store.WriteToken(st.Token); err != nil {
 				d.Display.UpdateError("could not save token")
 				return Result{Status: ResultFatal}, false

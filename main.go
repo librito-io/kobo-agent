@@ -59,6 +59,7 @@ func runPair(argv []string) int {
 		Store:          pair.NewFileStore(*dir, rand.Reader),
 		Clock:          realClock{},
 		DeviceModel:    deviceModel,
+		BaseURL:        *baseURL,
 		WiFiTimeout:    20 * time.Second,
 		PollEvery:      5 * time.Second,
 		CodeTTL:        300 * time.Second,

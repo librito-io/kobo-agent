@@ -45,6 +45,10 @@ func (s *fileStore) WriteToken(token string) error {
 	return s.write(filepath.Join(s.dir, "token"), token)
 }
 
+func (s *fileStore) WriteURL(url string) error {
+	return s.write(filepath.Join(s.dir, "url"), url)
+}
+
 func (s *fileStore) write(path, content string) error {
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
 		return err

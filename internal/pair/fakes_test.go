@@ -15,6 +15,8 @@ type fakeStore struct {
 	hwidCalls   int
 	token       string
 	tokenWrites int
+	url         string
+	urlWrites   int
 }
 
 func (s *fakeStore) LoadOrCreateHardwareID() (string, error) {
@@ -25,6 +27,7 @@ func (s *fakeStore) LoadOrCreateHardwareID() (string, error) {
 	return s.hwid, nil
 }
 func (s *fakeStore) WriteToken(t string) error { s.token = t; s.tokenWrites++; return nil }
+func (s *fakeStore) WriteURL(u string) error   { s.url = u; s.urlWrites++; return nil }
 
 // --- fakeWiFi: scripted connect result(s). ---
 type fakeWiFi struct {
