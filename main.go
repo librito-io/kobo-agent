@@ -21,6 +21,7 @@ import (
 	"github.com/librito-io/kobo-agent/internal/autosync"
 	"github.com/librito-io/kobo-agent/internal/pair"
 	"github.com/librito-io/kobo-agent/internal/sync"
+	"github.com/librito-io/kobo-agent/internal/watch"
 )
 
 // adsDir is where pairing persists hardware-id + token (co-located with the
@@ -33,6 +34,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "autosync" {
 		os.Exit(runAutosync(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "watch" {
+		os.Exit(runWatch(os.Args[2:]))
 	}
 	os.Exit(runSync(os.Args[1:]))
 }
@@ -142,6 +146,33 @@ func runAutosync(argv []string) int {
 		Timeout: 60 * time.Second,
 		Cadence: 2 * time.Second,
 	})
+}
+
+// runWatch (Task 1: probe only). The full resident daemon is wired in Task 8.
+func runWatch(argv []string) int {
+	fs := flag.NewFlagSet("watch", flag.ExitOnError)
+	dbPath := fs.String("db", "/mnt/onboard/.kobo/KoboReader.sqlite", "path to KoboReader.sqlite (its directory is watched)")
+	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
+	_ = fs.Parse(argv)
+
+	watchDir := filepath.Dir(*dbPath)
+	w, err := watch.NewWatcher(watchDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "watch: %v\n", err)
+		return 1
+	}
+	defer func() { _ = w.Close() }()
+
+	if *probe {
+		fmt.Printf("watch --probe: watching %s — make a highlight, Ctrl-C to stop\n", watchDir)
+		for ev := range w.Events() {
+			fmt.Printf("event: name=%q mask=%#x\n", ev.Name, ev.Mask)
+		}
+		return 0
+	}
+
+	fmt.Fprintln(os.Stderr, "watch: resident mode not yet implemented (Task 8)")
+	return 1
 }
 
 // resolveToken applies the precedence: flag > env > token file. A read error or
