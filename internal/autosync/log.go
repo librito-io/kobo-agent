@@ -57,7 +57,8 @@ func capLog(content []byte, max int) []byte {
 	}
 	tail := content[len(content)-max:]
 	// Drop the (likely partial) leading line so the file starts on a boundary.
-	if i := bytes.IndexByte(tail, '\n'); i >= 0 && i+1 <= len(tail) {
+	// IndexByte returns i in [0, len(tail)) when found, so i+1 <= len(tail) always.
+	if i := bytes.IndexByte(tail, '\n'); i >= 0 {
 		tail = tail[i+1:]
 	}
 	return tail
