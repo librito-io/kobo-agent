@@ -6,6 +6,7 @@
 //
 //	librito-kobo-agent              sync (token from --token / LIBRITO_TOKEN / token file)
 //	librito-kobo-agent pair         pair this device (writes hardware-id + token)
+//	librito-kobo-agent autosync     triggered sync (udev WiFi-up); token + url from files
 package main
 
 import (
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/librito-io/kobo-agent/internal/autosync"
 	"github.com/librito-io/kobo-agent/internal/pair"
 	"github.com/librito-io/kobo-agent/internal/sync"
 )
@@ -28,6 +30,9 @@ const adsDir = "/mnt/onboard/.adds/librito"
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "pair" {
 		os.Exit(runPair(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "autosync" {
+		os.Exit(runAutosync(os.Args[2:]))
 	}
 	os.Exit(runSync(os.Args[1:]))
 }
@@ -54,6 +59,7 @@ func runPair(argv []string) int {
 		Store:          pair.NewFileStore(*dir, rand.Reader),
 		Clock:          realClock{},
 		DeviceModel:    deviceModel,
+		BaseURL:        *baseURL,
 		WiFiTimeout:    20 * time.Second,
 		PollEvery:      5 * time.Second,
 		CodeTTL:        300 * time.Second,
@@ -115,6 +121,27 @@ func runSync(argv []string) int {
 	fmt.Printf("synced: read %d, sent %d → server imported %d across %d books\n",
 		out.Read, out.Built, out.Result.Imported, out.Result.Books)
 	return 0
+}
+
+func runAutosync(argv []string) int {
+	fs := flag.NewFlagSet("autosync", flag.ExitOnError)
+	dbPath := fs.String("db", "/mnt/onboard/.kobo/KoboReader.sqlite", "path to KoboReader.sqlite")
+	dir := fs.String("dir", adsDir, "directory holding the token + url files")
+	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL when no url file is present (pairing writes the url file)")
+	lockPath := fs.String("lock", "/tmp/librito-autosync.lock", "single-instance lock path (tmpfs)")
+	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path")
+	_ = fs.Parse(argv)
+
+	return autosync.Run(autosync.Deps{
+		Locker:  autosync.NewFlockLocker(*lockPath),
+		Config:  autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:  autosync.NewSysfsProber("wlan0"),
+		Syncer:  autosync.NewSyncer(*dbPath),
+		Logger:  autosync.NewFileLogger(*logPath, 64*1024),
+		Clock:   realClock{},
+		Timeout: 60 * time.Second,
+		Cadence: 2 * time.Second,
+	})
 }
 
 // resolveToken applies the precedence: flag > env > token file. A read error or

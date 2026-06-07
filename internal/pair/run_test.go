@@ -251,3 +251,21 @@ func TestRun_TTLBoundUsesMonotonicClock(t *testing.T) {
 		t.Fatalf("result = %v, want ResultExpired at TTL", res.Status)
 	}
 }
+
+func TestRun_PersistsBackendURLOnPairing(t *testing.T) {
+	c := &fakeClient{
+		reqSteps:    []reqStep{{pr: PairRequest{PollSecret: "ps", ExpiresIn: 300}, out: ReqOK}},
+		statusSteps: []statusStep{{st: PairStatus{Paired: true, Token: "sk_device_x"}, out: OutcomePaired}},
+	}
+	s := &fakeStore{}
+	d := deps(c, &fakeDisplay{}, &fakeWiFi{}, s, newFakeClock())
+	d.BaseURL = "http://192.168.68.54:5173"
+
+	res := Run(d)
+	if res.Status != ResultPaired {
+		t.Fatalf("result = %v, want ResultPaired", res.Status)
+	}
+	if s.url != "http://192.168.68.54:5173" || s.urlWrites != 1 {
+		t.Fatalf("backend URL not persisted exactly once: url=%q writes=%d", s.url, s.urlWrites)
+	}
+}

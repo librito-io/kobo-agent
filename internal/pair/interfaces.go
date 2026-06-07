@@ -89,6 +89,9 @@ type Store interface {
 	LoadOrCreateHardwareID() (string, error)
 	// WriteToken overwrites the token file (re-pair is an intentional overwrite).
 	WriteToken(token string) error
+	// WriteURL persists the backend base URL the device paired against, so
+	// autosync (Step 3) targets the same backend the token was minted on.
+	WriteURL(url string) error
 }
 
 // Clock abstracts elapsed time so the TTL bound is testable and uses MONOTONIC
