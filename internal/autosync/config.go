@@ -1,6 +1,8 @@
 package autosync
 
 import (
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,14 +40,42 @@ func (c *fileConfig) BaseURL() string {
 	return ResolveBaseURL(string(b), err == nil, c.defaultURL)
 }
 
-// ResolveBaseURL returns the trimmed url-file content when the file was present
-// and non-empty, else def. Pairing writes this file (Step 3 backend coupling),
-// so in practice the resolved backend matches the one the token was minted on.
+// ResolveBaseURL returns the validated url-file backend, else def. Pairing writes
+// this file (Step 3 backend coupling), so in practice the resolved backend matches
+// the one the token was minted on. The value is validated rather than trusted
+// verbatim: it must be an absolute http(s) URL, and plain http is honored only for
+// loopback/private hosts (the dev-LAN path) — sending the bearer token in cleartext
+// to a public host is refused. Anything missing/empty/malformed/unsafe → def, so a
+// bad url file fails safe to the compiled default instead of at POST time.
 func ResolveBaseURL(content string, found bool, def string) string {
-	if found {
-		if u := strings.TrimSpace(content); u != "" {
-			return u
+	if !found {
+		return def
+	}
+	raw := strings.TrimSpace(content)
+	if raw == "" {
+		return def
+	}
+	u, err := url.Parse(raw)
+	if err != nil || !u.IsAbs() || u.Host == "" {
+		return def
+	}
+	switch u.Scheme {
+	case "https":
+		return raw
+	case "http":
+		if isLoopbackOrPrivate(u.Hostname()) {
+			return raw
 		}
 	}
 	return def
+}
+
+// isLoopbackOrPrivate reports whether host is localhost or a loopback/RFC1918 IP —
+// the only hosts allowed to receive the bearer token over plain http.
+func isLoopbackOrPrivate(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
 }
