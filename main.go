@@ -183,15 +183,19 @@ func runWatch(argv []string) int {
 		return 0
 	}
 
+	// Stateless edges shared by both Deps structs (one instance serves both).
+	prober := autosync.NewSysfsProber("wlan0")
+	logger := autosync.NewFileLogger(*logPath, 64*1024)
+
 	// Resident daemon. The sync delegates to autosync.Run with the SAME shared
 	// lock as the udev path (so they never double-run) but a SHORT timeout (we
 	// only sync when already connected). Single-instance via a SEPARATE watch lock.
 	runner := watch.NewRunner(autosync.Deps{
 		Locker:  autosync.NewFlockLocker(*syncLock),
 		Config:  autosync.NewFileConfig(*dir, *defaultURL),
-		Prober:  autosync.NewSysfsProber("wlan0"),
+		Prober:  prober,
 		Syncer:  autosync.NewSyncer(*dbPath),
-		Logger:  autosync.NewFileLogger(*logPath, 64*1024),
+		Logger:  logger,
 		Clock:   realClock{},
 		Timeout: 5 * time.Second,
 		Cadence: 2 * time.Second,
@@ -201,9 +205,9 @@ func runWatch(argv []string) int {
 		Locker:    autosync.NewFlockLocker(*watchLock),
 		Watcher:   w,
 		SigReader: watch.NewSigReader(*dbPath),
-		Prober:    autosync.NewSysfsProber("wlan0"),
+		Prober:    prober,
 		Runner:    runner,
-		Logger:    autosync.NewFileLogger(*logPath, 64*1024),
+		Logger:    logger,
 		Clock:     realClock{},
 		WALName:   wal,
 		Window:    5 * time.Second,

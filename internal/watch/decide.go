@@ -11,7 +11,7 @@ const (
 
 // decide maps (prev signature, cur signature, connectivity) to the loop's action.
 // Pure: no growth short-circuits regardless of connectivity; growth requires
-// readiness to sync (otherwise the Step-3 udev up-edge syncs it later).
+// readiness to sync (otherwise the udev autosync up-edge syncs it later).
 func decide(prev, cur Signature, ready bool) action {
 	if !grew(prev, cur) {
 		return actionSkipNoGrowth

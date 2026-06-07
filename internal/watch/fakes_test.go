@@ -46,22 +46,24 @@ func (w *fakeWatcher) Events() <-chan Event { return w.ch }
 func (w *fakeWatcher) Close() error         { return nil }
 
 // fakeSigReader: scripted sequence of signatures; the last repeats. The first
-// Read() is the baseline.
+// Read() is the baseline. If err is set, it is returned on call number errOnCall
+// (1-based); errOnCall == 0 means err applies to every call.
 type fakeSigReader struct {
-	sigs  []Signature
-	err   error
-	calls int
+	sigs      []Signature
+	err       error
+	errOnCall int
+	calls     int
 }
 
 func (s *fakeSigReader) Read() (Signature, error) {
-	if s.err != nil {
+	s.calls++
+	if s.err != nil && (s.errOnCall == 0 || s.errOnCall == s.calls) {
 		return Signature{}, s.err
 	}
-	i := s.calls
+	i := s.calls - 1
 	if i >= len(s.sigs) {
 		i = len(s.sigs) - 1
 	}
-	s.calls++
 	return s.sigs[i], nil
 }
 

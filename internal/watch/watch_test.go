@@ -139,6 +139,38 @@ func TestRun_SyncError_HoldsBaseline(t *testing.T) {
 	}
 }
 
+func TestRun_BaselineReadError_DegradesThenSyncs(t *testing.T) {
+	// Baseline read (call 1) errors → degrade to zero Signature; a later growth
+	// still syncs (zero baseline → any real count grows).
+	l := &fakeLocker{ok: true}
+	s := &fakeSigReader{sigs: []Signature{{5, "d1"}}, err: errors.New("db locked"), errOnCall: 1}
+	r := &fakeRunner{}
+	lg := &fakeLogger{}
+	Run(deps(l, newFakeWatcher(walEvent()), s, &fakeProber{true}, r, lg))
+	if !containsLine(lg.lines, "watch: baseline read error") {
+		t.Fatalf("missing baseline read error line, got %v", lg.lines)
+	}
+	if r.calls != 1 {
+		t.Fatalf("sync calls = %d, want 1 (zero baseline → first growth syncs)", r.calls)
+	}
+}
+
+func TestRun_EvaluateSigReaderError_HoldsBaseline(t *testing.T) {
+	// Baseline (call 1) succeeds; the mid-loop read (call 2) errors → log + hold
+	// baseline, no sync.
+	l := &fakeLocker{ok: true}
+	s := &fakeSigReader{sigs: []Signature{{7, "d0"}}, err: errors.New("db locked"), errOnCall: 2}
+	r := &fakeRunner{}
+	lg := &fakeLogger{}
+	Run(deps(l, newFakeWatcher(walEvent()), s, &fakeProber{true}, r, lg))
+	if r.calls != 0 {
+		t.Fatalf("sync calls = %d, want 0 (read error holds baseline)", r.calls)
+	}
+	if !containsLine(lg.lines, "watch: signature read error") {
+		t.Fatalf("missing signature read error line, got %v", lg.lines)
+	}
+}
+
 func containsLine(lines []string, substr string) bool {
 	for _, l := range lines {
 		if strings.Contains(l, substr) {
