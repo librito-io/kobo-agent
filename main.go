@@ -7,6 +7,7 @@
 //	librito-kobo-agent              sync (token from --token / LIBRITO_TOKEN / token file)
 //	librito-kobo-agent pair         pair this device (writes hardware-id + token)
 //	librito-kobo-agent autosync     triggered sync (udev WiFi-up); token + url from files
+//	librito-kobo-agent watch        resident daemon: immediate sync on a new highlight while connected
 package main
 
 import (
@@ -21,6 +22,7 @@ import (
 	"github.com/librito-io/kobo-agent/internal/autosync"
 	"github.com/librito-io/kobo-agent/internal/pair"
 	"github.com/librito-io/kobo-agent/internal/sync"
+	"github.com/librito-io/kobo-agent/internal/watch"
 )
 
 // adsDir is where pairing persists hardware-id + token (co-located with the
@@ -33,6 +35,9 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "autosync" {
 		os.Exit(runAutosync(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "watch" {
+		os.Exit(runWatch(os.Args[2:]))
 	}
 	os.Exit(runSync(os.Args[1:]))
 }
@@ -141,6 +146,72 @@ func runAutosync(argv []string) int {
 		Clock:   realClock{},
 		Timeout: 60 * time.Second,
 		Cadence: 2 * time.Second,
+	})
+}
+
+// runWatch runs the resident watcher daemon (or, with --probe, the inotify spike).
+func runWatch(argv []string) int {
+	fs := flag.NewFlagSet("watch", flag.ExitOnError)
+	dbPath := fs.String("db", "/mnt/onboard/.kobo/KoboReader.sqlite", "path to KoboReader.sqlite (its directory is watched)")
+	dir := fs.String("dir", adsDir, "directory holding the token + url files")
+	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL when no url file is present")
+	syncLock := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock (serializes against the udev autosync)")
+	watchLock := fs.String("watch-lock", "/tmp/librito-watch.lock", "single-instance lock for this daemon")
+	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path (shared with autosync)")
+	walName := fs.String("wal-name", "", "WAL filename to react to (default: <db basename>-wal; escape hatch if the spike shows a different name)")
+	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
+	_ = fs.Parse(argv)
+
+	wal := *walName
+	if wal == "" {
+		wal = filepath.Base(*dbPath) + "-wal"
+	}
+
+	watchDir := filepath.Dir(*dbPath) // the watched directory (holds KoboReader.sqlite + its -wal)
+	w, err := watch.NewWatcher(watchDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "watch: %v\n", err)
+		return 1
+	}
+	defer func() { _ = w.Close() }()
+
+	if *probe {
+		fmt.Printf("watch --probe: watching %s — make a highlight, Ctrl-C to stop\n", watchDir)
+		for ev := range w.Events() {
+			fmt.Printf("event: name=%q mask=%#x\n", ev.Name, ev.Mask)
+		}
+		return 0
+	}
+
+	// Stateless edges shared by both Deps structs (one instance serves both).
+	prober := autosync.NewSysfsProber("wlan0")
+	logger := autosync.NewFileLogger(*logPath, 64*1024)
+
+	// Resident daemon. The sync delegates to autosync.Run with the SAME shared
+	// lock as the udev path (so they never double-run) but a SHORT timeout (we
+	// only sync when already connected). Single-instance via a SEPARATE watch lock.
+	runner := watch.NewRunner(autosync.Deps{
+		Locker:  autosync.NewFlockLocker(*syncLock),
+		Config:  autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:  prober,
+		Syncer:  autosync.NewSyncer(*dbPath),
+		Logger:  logger,
+		Clock:   realClock{},
+		Timeout: 5 * time.Second,
+		Cadence: 2 * time.Second,
+	})
+
+	return watch.Run(watch.Deps{
+		Locker:    autosync.NewFlockLocker(*watchLock),
+		Watcher:   w,
+		SigReader: watch.NewSigReader(*dbPath),
+		Prober:    prober,
+		Runner:    runner,
+		Logger:    logger,
+		Clock:     realClock{},
+		WALName:   wal,
+		Window:    5 * time.Second,
+		Cap:       15 * time.Second,
 	})
 }
 

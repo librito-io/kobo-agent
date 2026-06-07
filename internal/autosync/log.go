@@ -12,12 +12,13 @@ type Logger interface {
 	Log(line string)
 }
 
-// FormatLine composes one log line: a UTC RFC3339 timestamp + "autosync: " +
-// msg + newline. UTC is load-bearing — udev's RUN has no TZ and the Kobo
+// FormatLine composes one log line: a UTC RFC3339 timestamp + tag + ": " + msg +
+// newline (e.g. "… autosync: imported 6…" or "… watch: started"). tag carries no
+// colon or spaces. UTC is load-bearing — udev's RUN has no TZ and the Kobo
 // wall-clock zone is unreliable (CLAUDE.md invariant #3), so the timestamp is
 // always normalized to UTC regardless of t's location.
-func FormatLine(t time.Time, msg string) string {
-	return t.UTC().Format(time.RFC3339) + " autosync: " + msg + "\n"
+func FormatLine(t time.Time, tag, msg string) string {
+	return t.UTC().Format(time.RFC3339) + " " + tag + ": " + msg + "\n"
 }
 
 // fileLogger appends lines to path and keeps the file under maxBytes by

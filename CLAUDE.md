@@ -1,8 +1,9 @@
 # CLAUDE.md — librito-kobo-agent
 
 On-device Go agent that reads stock-Nickel highlights from a Kobo e-reader and
-syncs them to the Librito web backend. **Work in progress** — Step 1 (the sync
-core) is done and hardware-verified; Steps 2–5 are not built yet (see _Roadmap_).
+syncs them to the Librito web backend. **Work in progress** — Steps 1–3.5 (sync
+core, pairing, udev WiFi-up autosync, resident watch daemon) are done and
+hardware-verified; Steps 4–5 are not built yet (see _Roadmap_).
 
 > **This is a public repo** (`librito-io/kobo-agent`, GPLv3). Keep personal
 > data out of fixtures and commits (see _Fixtures_). Do not push to a remote
@@ -34,20 +35,30 @@ rows leave the word-index columns NULL and render as plain quoted text.
 ## Architecture
 
 ```
-main.go                 flags (--db --url --token --dry-run), thin glue over Run
+main.go                 subcommand dispatch: sync (default) | pair | autosync | watch
 internal/sync/
   run.go      Run()         read → map → (post | dry-run); the orchestrator
   client.go   PostImport()  POST {url}/api/import/kobo, bearer token, full set
 internal/kobo/
-  read.go     ReadHighlights()  WAL-aware SQLite read → []RawBookmark
+  read.go       ReadHighlights()          WAL-aware SQLite read → []RawBookmark
+  signature.go  ReadHighlightSignature()  lightweight count + max(DateCreated)
 internal/transform/
   transform.go  NormalizeISBN / NormalizeTimestamp / CleanText  (pure)
   item.go       RawBookmark, KoboImportItem, BuildItem()        (pure mapping)
+internal/pair/    `pair` subcommand: on-device token acquisition (Step 2)
+internal/autosync/  `autosync` subcommand: udev WiFi-up trigger → lock → connectivity-wait → sync.Run (Step 3)
+  prober.go / lock.go / config.go / wait.go / log.go / syncer.go   (reused by watch)
+internal/watch/   `watch` subcommand: resident inotify daemon, immediate sync while connected (Step 3.5)
+  watch.go      Run()       single-instance lock → baseline → debounce → signature-diff → delegate to autosync.Run
+  signature.go / decide.go / debounce.go   (pure core: grew / decide / debounceWait)
+  watcher.go + inotify_linux.go / inotify_other.go   Watcher edge (x/sys/unix; linux impl + !linux stub)
 ```
 
 **Pure core / impure edge split.** All mapping decisions live in `transform`
-(pure, table-tested — every live-data edge case is a test row). `kobo` (SQLite)
-and `sync` (HTTP) are the only impure packages. This is deliberate: the tricky
+(pure, table-tested — every live-data edge case is a test row). The impure edges
+are isolated and thin: `kobo` (SQLite), `sync` (HTTP), and the `autosync`/`watch`
+trigger edges (sysfs/flock, inotify) — each behind an interface with a fake, so
+the orchestration logic stays table-tested. This is deliberate: the tricky
 correctness is in pure functions you can test exhaustively without a device or a
 server.
 
@@ -161,8 +172,9 @@ read as fact.
   (Overloading the existing `notes` table is blocked for technical reasons —
   RLS, the word-index down-path keying, the one-note-per-highlight unique. A
   separate table is the path if/when this ships.)
-- **Steps 2–5 (not built):** on-device pairing (token to disk via NickelMenu) ·
-  udev WiFi-up auto-sync trigger · FBInk status dashboard · Mac installer app.
+- **Steps 2–3.5 (built, hardware-verified):** on-device pairing (token to disk
+  via NickelMenu) · udev WiFi-up auto-sync trigger · resident inotify watch daemon.
+- **Steps 4–5 (not built):** FBInk status dashboard · Mac installer app.
 - **Tracked issues:** web#502 (device→web delete propagation), web#503 (recover
   real ISBN from epub OPF when Nickel surfaces junk).
 

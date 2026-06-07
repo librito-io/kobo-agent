@@ -68,5 +68,5 @@ func Run(d Deps) int {
 // log composes a UTC line (Clock.Now is normalized to UTC by FormatLine) and
 // appends it via the Logger. Best-effort — a log failure never changes the exit.
 func (d Deps) log(msg string) {
-	d.Logger.Log(FormatLine(d.Clock.Now(), msg))
+	d.Logger.Log(FormatLine(d.Clock.Now(), "autosync", msg))
 }
