@@ -7,6 +7,7 @@
 //	librito-kobo-agent              sync (token from --token / LIBRITO_TOKEN / token file)
 //	librito-kobo-agent pair         pair this device (writes hardware-id + token)
 //	librito-kobo-agent autosync     triggered sync (udev WiFi-up); token + url from files
+//	librito-kobo-agent watch        resident daemon: immediate sync on a new highlight while connected
 package main
 
 import (
@@ -148,14 +149,25 @@ func runAutosync(argv []string) int {
 	})
 }
 
-// runWatch (Task 1: probe only). The full resident daemon is wired in Task 8.
+// runWatch runs the resident watcher daemon (or, with --probe, the inotify spike).
 func runWatch(argv []string) int {
 	fs := flag.NewFlagSet("watch", flag.ExitOnError)
 	dbPath := fs.String("db", "/mnt/onboard/.kobo/KoboReader.sqlite", "path to KoboReader.sqlite (its directory is watched)")
+	dir := fs.String("dir", adsDir, "directory holding the token + url files")
+	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL when no url file is present")
+	syncLock := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock (serializes against the udev autosync)")
+	watchLock := fs.String("watch-lock", "/tmp/librito-watch.lock", "single-instance lock for this daemon")
+	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path (shared with autosync)")
+	walName := fs.String("wal-name", "", "WAL filename to react to (default: <db basename>-wal; escape hatch if the spike shows a different name)")
 	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
 	_ = fs.Parse(argv)
 
-	watchDir := filepath.Dir(*dbPath)
+	wal := *walName
+	if wal == "" {
+		wal = filepath.Base(*dbPath) + "-wal"
+	}
+
+	watchDir := filepath.Dir(*dbPath) // the watched directory (holds KoboReader.sqlite + its -wal)
 	w, err := watch.NewWatcher(watchDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "watch: %v\n", err)
@@ -171,8 +183,32 @@ func runWatch(argv []string) int {
 		return 0
 	}
 
-	fmt.Fprintln(os.Stderr, "watch: resident mode not yet implemented (Task 8)")
-	return 1
+	// Resident daemon. The sync delegates to autosync.Run with the SAME shared
+	// lock as the udev path (so they never double-run) but a SHORT timeout (we
+	// only sync when already connected). Single-instance via a SEPARATE watch lock.
+	runner := watch.NewRunner(autosync.Deps{
+		Locker:  autosync.NewFlockLocker(*syncLock),
+		Config:  autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:  autosync.NewSysfsProber("wlan0"),
+		Syncer:  autosync.NewSyncer(*dbPath),
+		Logger:  autosync.NewFileLogger(*logPath, 64*1024),
+		Clock:   realClock{},
+		Timeout: 5 * time.Second,
+		Cadence: 2 * time.Second,
+	})
+
+	return watch.Run(watch.Deps{
+		Locker:    autosync.NewFlockLocker(*watchLock),
+		Watcher:   w,
+		SigReader: watch.NewSigReader(*dbPath),
+		Prober:    autosync.NewSysfsProber("wlan0"),
+		Runner:    runner,
+		Logger:    autosync.NewFileLogger(*logPath, 64*1024),
+		Clock:     realClock{},
+		WALName:   wal,
+		Window:    5 * time.Second,
+		Cap:       15 * time.Second,
+	})
 }
 
 // resolveToken applies the precedence: flag > env > token file. A read error or
