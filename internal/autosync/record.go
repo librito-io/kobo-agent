@@ -10,17 +10,6 @@ import (
 // record.go implements the last-sync record: a small JSON file read-modify-written
 // by RecordStore after each sync attempt, read back only by `agent status`.
 
-// --- TEMPORARY STUB: remove when Task 2 lands the full Outcome enum ---
-type Outcome int
-
-const (
-	OutcomeSynced  Outcome = iota
-	OutcomeOffline         // will be wired to connectivity-timeout path
-	OutcomeError           // will be wired to sync-error path
-)
-
-// --- END TEMPORARY STUB ---
-
 // Record is the persisted last-sync state. Its ONLY reader is `agent status`
 // (via internal/status.DecideStatusLine); sync-now uses Run's return value, not
 // this file. Timestamps are wall-clock (calendar) time — see the spec's
