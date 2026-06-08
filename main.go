@@ -153,8 +153,11 @@ func runAutosync(argv []string) int {
 	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL when no url file is present (pairing writes the url file)")
 	lockPath := fs.String("lock", "/tmp/librito-autosync.lock", "single-instance lock path (tmpfs)")
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path")
-	recordPath := fs.String("record", filepath.Join(adsDir, "last-sync"), "last-sync record path")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
 
 	return autosync.Run(autosync.Deps{
 		Locker:     autosync.NewFlockLocker(*lockPath),
@@ -244,8 +247,11 @@ func runWatch(argv []string) int {
 func runStatus(argv []string) int {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	dir := fs.String("dir", adsDir, "directory holding the token + last-sync files")
-	recordPath := fs.String("record", filepath.Join(adsDir, "last-sync"), "last-sync record path")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
 
 	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
 	rec, _ := autosync.LoadRecord(*recordPath)
@@ -276,8 +282,11 @@ func runSyncNow(argv []string) int {
 	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL")
 	lockPath := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock")
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "result log path")
-	recordPath := fs.String("record", filepath.Join(adsDir, "last-sync"), "last-sync record path")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
 
 	// 1. Best-effort "Syncing…" toast fills the cmd_output dead-gap (menu closes,
 	//    nothing on screen until we print). Separate from the in-Run success toast.
