@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // fileStore persists hardware-id + token under dir (production:
@@ -47,6 +48,13 @@ func (s *fileStore) WriteToken(token string) error {
 
 func (s *fileStore) WriteURL(url string) error {
 	return s.write(filepath.Join(s.dir, "url"), url)
+}
+
+func (s *fileStore) WriteAccount(email string, pairedAt time.Time) error {
+	if err := s.write(filepath.Join(s.dir, "email"), email); err != nil {
+		return err
+	}
+	return s.write(filepath.Join(s.dir, "paired-at"), pairedAt.UTC().Format(time.RFC3339))
 }
 
 func (s *fileStore) write(path, content string) error {
