@@ -1,0 +1,6 @@
+# Boot-persist dropbear. Install to /etc/udev/rules.d/96-dropbear.rules (rootfs).
+#
+# loop0 appears early on boot; this fires once and launches the detached starter.
+# Rootfs lives on /dev/root (ext4) so this survives reboot — but NOT a firmware
+# update (rootfs is replaced; the Step-5 installer reinstalls it).
+KERNEL=="loop0", RUN+="/bin/sh -c '/usr/local/dropbear/boot.sh'"

@@ -1,0 +1,16 @@
+# Librito DEV NickelMenu config — copy to /mnt/onboard/.adds/nm/config
+#
+# DEV-ONLY menu items for the on-hardware loop (SSH recovery + smoke tests).
+# Distinct from the PRODUCT menu (../nm/librito → /mnt/onboard/.adds/nm/librito),
+# which ships the user-facing Sync/Status/About/Pair items.
+#
+# ⚠️ NickelMenu loads EVERY file in /mnt/onboard/.adds/nm/ — a stray copy (e.g.
+#    config.bak) duplicates every item. Keep exactly one dev file in that dir.
+#
+# 🛑 Dev-only — must NOT ship. "SSH open" runs the blank-root-password fallback.
+
+experimental :menu_main_15505_label :Librito
+menu_item :main :NM Test uname :cmd_output :3000 :uname -a
+menu_item :main :NDB Test toast :cmd_spawn :quiet :qndb -m mwcToast 3000 "NDB OK"
+menu_item :main :SSH open :cmd_output :5000 :sh /mnt/onboard/.adds/librito/ssh-open.sh
+menu_item :main :SSH diag :cmd_output :5000 :pidof dropbear; cat /usr/local/dropbear/dropbear.log 2>&1; ifconfig 2>/dev/null | grep -w inet | grep -v 127.0.0.1
