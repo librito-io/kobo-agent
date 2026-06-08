@@ -29,8 +29,16 @@ exit 0
 INNER
 chmod 755 /usr/local/dropbear/on-boot.sh
 # load-bearing: root's home is /, which shipped owned by uid 501 → dropbear
-# rejected every pubkey. Non-recursive + idempotent. Reverse: chown 501:root /
-chown 0:0 /
+# rejected every pubkey. Non-recursive + idempotent. We record the prior owner so
+# the undo is correct on a device that did NOT ship as 501 (don't hard-code it).
+PRIOR_ROOT_OWNER=$(stat -c '%u:%g' / 2>/dev/null)
+echo "/ owner before: ${PRIOR_ROOT_OWNER:-unknown}  (undo with: chown ${PRIOR_ROOT_OWNER:-501:0} /)"
+if [ "$PRIOR_ROOT_OWNER" = "0:0" ]; then
+  echo "/ already root-owned — chown not needed"
+else
+  chown 0:0 /
+  echo "/ chowned to 0:0"
+fi
 # fix key ownership/perms
 chown -R root:root /.ssh 2>/dev/null
 chmod 700 /.ssh

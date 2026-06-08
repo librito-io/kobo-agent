@@ -28,13 +28,26 @@ local-only build plan (`docs/agent-build-plan.md`, gitignored), **not here**.
 | `ssh/ssh-open.sh`       | `/mnt/onboard/.adds/librito/` (user part.) | NickelMenu blank-password recovery hatch                                        |
 | `nm-config`             | `/mnt/onboard/.adds/nm/config`             | dev NickelMenu (SSH open/diag + smoke tests)                                    |
 
-**Not in version control (yet):** the cross-compiled `dropbear` + `dropbearkey`
-binaries and the self-installing `KoboRoot.tgz`. On a fresh device the scripts
-above are inert without that binary. Build recipe: cross-compile dropbear
+**Third-party mods you install (public, not in this repo):**
+
+- **NickelMenu** v0.6.0 — `https://github.com/pgaskin/NickelMenu/releases/download/v0.6.0/KoboRoot.tgz`
+- **NickelDBus** 0.2.0 — `https://github.com/shermp/NickelDBus/releases/download/0.2.0/KoboRoot.tgz`
+
+Both assets are literally named `KoboRoot.tgz` — **rename on disk before copying**
+so they don't overwrite each other (e.g. `KoboRoot-nm.tgz` / `KoboRoot-ndb.tgz`;
+the device unpacks any `*.tgz` you drop in `.kobo/`). Pin these versions — newer
+ones are untested against this firmware.
+
+**The dropbear `KoboRoot.tgz` is NOT in version control and cannot be built from
+this runbook** — the scripts above are inert without it. Reproducing it is the
+one true gap (tracked: kobo-agent#26). Rough recipe: cross-compile dropbear
 (v2025.89, modern, with ML-KEM/sntrup761) from `obynio/kobopatch-ssh`'s toolchain
-— the `obynio/kobo-toolchain:crosstools` image is **arm64-native** (do NOT force
-`--platform linux/amd64` on Apple Silicon). Packaging that recipe into VC is
-tracked separately (it overlaps the Step-5 installer's bundled `KoboRoot.tgz`).
+(the `obynio/kobo-toolchain:crosstools` image is **arm64-native** — do NOT force
+`--platform linux/amd64` on Apple Silicon), then package a `KoboRoot.tgz` that
+installs the binaries to `/usr/local/bin/` **and bundles the three rootfs files
+from `ssh/` here** (`96-dropbear.rules` → `/etc/udev/rules.d/`, `boot.sh` +
+`on-boot.sh` → `/usr/local/dropbear/`). Until #26 lands, you need a prebuilt copy
+of that tgz from a known-good machine.
 
 ## Two SSH auth paths (know the difference)
 
@@ -64,26 +77,60 @@ because you must run it by hand:
 chown 0:0 /
 ```
 
+## Prerequisites (do these before bring-up)
+
+A factory-fresh device cannot be reached over SSH until it is on your LAN, and a
+firmware drift silently invalidates this whole recipe. So, first:
+
+1. **Complete Nickel onboarding and join your WiFi.** A factory-reset Libra Colour
+   boots into the activation wizard — go through it and connect to the same network
+   as your dev machine. SSH-over-LAN below assumes the device is reachable.
+2. **🛑 Do NOT let it firmware-update.** This recipe is verified on Nickel
+   4.45.23697 only (see the banner). If the wizard offers an OTA, decline it; after
+   setup, confirm auto-update is OFF (Settings → Device information → Automatic
+   updates). A surprise OTA replaces the rootfs and breaks the mod stack — re-verify
+   everything if the firmware ever moves.
+3. **Have an SSH keypair on your dev machine.** If `~/.ssh/id_ed25519.pub` does not
+   exist, create one: `ssh-keygen -t ed25519`. (The bring-up plants this exact file;
+   adjust the path below if yours differs.)
+4. **Run the SSH steps from this `dev/` directory** — the `cat`-pipe commands read
+   relative paths like `ssh/ssh-key.sh`. `cd` into `dev/` first.
+
 ## Fresh-device bring-up (first touch — USB + taps, then SSH)
 
 Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
 
-1. **Install the mod stack via USB.** Drop the dropbear `KoboRoot.tgz` (see build
-   recipe above) plus NickelMenu + NickelDBus `KoboRoot.tgz` files into
-   `/Volumes/KOBOeReader/.kobo/`, eject. Device unpacks on boot. (NickelMenu /
-   NickelDBus URLs + install notes: build plan.)
+1. **Install the mod stack via USB.** Plug the Kobo into your Mac; it mounts as
+   `/Volumes/KOBOeReader` (confirm with `ls /Volumes/` — relabel the path below if
+   yours differs). Drop **three** renamed tgz files into
+   `/Volumes/KOBOeReader/.kobo/`: the prebuilt dropbear tgz, the NickelMenu tgz, and
+   the NickelDBus tgz (URLs + the rename-so-they-don't-collide note are above). Eject;
+   the device unpacks each on boot and deletes the tgz.
 2. **Place the dev files via USB** onto the user partition:
    - `nm-config` → `/Volumes/KOBOeReader/.adds/nm/config`
    - `ssh/ssh-open.sh` → `/Volumes/KOBOeReader/.adds/librito/ssh-open.sh`
-     Eject.
-3. **Reboot.** The `loop0` udev rule starts key-only dropbear — but your key isn't
-   planted and `/` ownership isn't fixed yet, so key auth won't work _yet_.
-4. **Tap NickelMenu → Librito → "SSH open."** Blanks root pw, starts
-   `dropbear -B`. You can now SSH in with `BatchMode` (blank/none auth).
-5. **SSH in and make key auth permanent:**
+
+   ⚠️ **macOS pollutes the device.** Finder writes `._`-prefixed AppleDouble
+   sidecars (e.g. `._config`) next to every file. NickelMenu loads **every** file in
+   `.adds/nm/`, so a stray `._config` duplicates the whole menu. After copying, run
+   `dot_clean /Volumes/KOBOeReader` (or `find /Volumes/KOBOeReader -name '._*' -delete`)
+   before ejecting. Eject.
+
+3. **Reboot** (Nickel: power button → _Power off_ / _Restart_, or once SSH is up,
+   `reboot` over SSH — **never** `pwrReboot`, it crashes Nickel; invariant #7). The
+   `loop0` udev rule starts key-only dropbear — but your key isn't planted and `/`
+   ownership isn't fixed yet, so key auth won't work _yet_.
+4. **Tap NickelMenu → Librito → "SSH open."** Blanks root pw, starts `dropbear -B`;
+   the dialog prints the device's IP. You can now SSH in with `BatchMode` (blank/none
+   auth). **If this menu item is absent**, the NickelMenu tgz didn't unpack (re-check
+   step 1) — there is no other entry path to a fresh device, so don't reboot past
+   this until the menu appears.
+5. **SSH in and make key auth permanent** (run from `dev/`):
 
    ```sh
-   CM=/tmp/kobo-ssh-master; IP=<device-ip from build plan>
+   # IP: from the "SSH open" dialog, or your router's DHCP table, or match the
+   #   device's wlan0 MAC against the ARP table: arp -a | grep -i <your-mac-prefix>
+   CM=/tmp/kobo-ssh-master; IP=<device-ip>
    ssh -M -S "$CM" -o ServerAliveInterval=10 -fN root@$IP
    S(){ ssh -S "$CM" root@$IP "$@"; }
 
@@ -91,7 +138,7 @@ Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
    S 'cat > /mnt/onboard/.adds/librito/ssh-key.sh' < ssh/ssh-key.sh
    S 'cat > /mnt/onboard/.adds/librito/ssh-fix.sh' < ssh/ssh-fix.sh
 
-   # repair on-boot.sh + run the load-bearing chown 0:0 / + fix /.ssh perms
+   # repair on-boot.sh + chown 0:0 / (verified, not blind) + fix /.ssh perms
    S 'sh /mnt/onboard/.adds/librito/ssh-fix.sh'
 
    # plant your pubkey for key-only auth
@@ -112,11 +159,25 @@ traffic (a gateway-ping keepalive does **not** stop it). For an SSH session that
 stays up, set `ForceWifiOn=true` under `[DeveloperSettings]` in
 `/mnt/onboard/.kobo/Kobo/Kobo eReader.conf` (note the nested `Kobo/`). The file is
 on `/mnt/onboard` (mounted **rw** — edit over SSH, it is NOT USB-only); Nickel
-reads the conf **only at startup**, so reboot to load:
+reads the conf **only at startup**, so reboot to load.
+
+On a fresh device the `[DeveloperSettings]` section and the `ForceWifiOn` line
+often **don't exist yet** (Nickel writes the conf lazily), so a plain `sed`
+substitution silently no-ops. Add-or-replace instead:
 
 ```sh
-S "sed -i 's/^ForceWifiOn=false/ForceWifiOn=true/' '/mnt/onboard/.kobo/Kobo/Kobo eReader.conf'"
-# then reboot
+CONF='/mnt/onboard/.kobo/Kobo/Kobo eReader.conf'
+S "
+  if grep -q '^ForceWifiOn=' '$CONF'; then
+    sed -i 's/^ForceWifiOn=.*/ForceWifiOn=true/' '$CONF'
+  elif grep -q '^\[DeveloperSettings\]' '$CONF'; then
+    sed -i 's/^\[DeveloperSettings\]/[DeveloperSettings]\nForceWifiOn=true/' '$CONF'
+  else
+    printf '\n[DeveloperSettings]\nForceWifiOn=true\n' >> '$CONF'
+  fi
+  grep -A1 'DeveloperSettings' '$CONF'
+"
+# then reboot to load
 ```
 
 ⚠️ Dev-only — it costs battery. The **product** agent must never assume a standing
