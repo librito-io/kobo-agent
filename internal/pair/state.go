@@ -8,10 +8,11 @@ import (
 	"time"
 )
 
-// fileStore persists hardware-id + token under dir (production:
-// /mnt/onboard/.adds/librito/). Files are 0600; dir is created if missing.
-// .adds/ is USB-exported, so the token is world-readable to anyone who mounts
-// the device — the real protection is the SSH-hardening prereq (spec §Prereq).
+// fileStore persists hardware-id + token (+ account email + paired-at) under dir
+// (production: /mnt/onboard/.adds/librito/). Files are 0600; dir is created if
+// missing. .adds/ is USB-exported, so the token AND the account email/paired-at
+// are world-readable to anyone who mounts the device — the real protection is the
+// SSH-hardening prereq (spec §Prereq).
 type fileStore struct {
 	dir string
 	rnd io.Reader // random source for hardware-id generation (crypto/rand in prod)
