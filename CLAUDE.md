@@ -114,8 +114,9 @@ Requires Go 1.24+.
 
 ```sh
 # static cross-compile for the Kobo (armv7l hard-float) — no C toolchain
+# -X main.version stamps the version surfaced by `agent about` (single origin).
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
-  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-agent-armv7 .
+  go build -trimpath -ldflags="-s -w -X main.version=0.9.0" -o dist/librito-kobo-agent-armv7 .
 
 go test ./...
 ```
