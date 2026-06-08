@@ -28,7 +28,7 @@ func (qndbViewProber) CurrentView() string {
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(lastLineField(string(out)))
+	return lastLineField(string(out))
 }
 
 // qndbToaster fires `qndb -m mwcToast <durationMs> <main> <sub>`. Errors swallowed.

@@ -38,6 +38,7 @@ func TestFormatRelative(t *testing.T) {
 		d    time.Duration
 		want string
 	}{
+		{-1 * time.Second, "just now"}, // clock skew / future stamp → safe floor
 		{20 * time.Second, "just now"},
 		{1 * time.Minute, "1 minute ago"},
 		{2 * time.Minute, "2 minutes ago"},
