@@ -61,7 +61,14 @@ func (s *fileRecordStore) Record(o Outcome) {
 		return // best-effort; a record failure never fails a sync
 	}
 	_ = os.MkdirAll(filepath.Dir(s.path), 0o755)
-	_ = os.WriteFile(s.path, b, 0o600)
+	// Write to a temp file then rename: rename is atomic on the same filesystem,
+	// so `agent status` (which reads WITHOUT the shared sync lock) can never observe
+	// a torn/half-written record. Writer-vs-writer is already serialized by the lock.
+	tmp := s.path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, s.path)
 }
 
 // LoadRecord reads the record file. ok=false when absent or unparseable (the
