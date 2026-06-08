@@ -102,8 +102,9 @@ Each looks wrong to someone who doesn't know the context. They are correct.
    agent may bring WiFi up via `qndb -m wfmConnectWirelessSilently` and wait on
    the `wmNetworkConnected` signal. It must **never** call `wfmConnectWireless`
    (non-silent) or `pwrReboot`: on hardware (2026-06-06) the non-silent method
-   popped a full-screen network-picker modal and **crashed Nickel into a reboot**,
-   and reboot-as-recovery kills the (non-boot-persistent) dev SSH. Note two WiFi
+   popped a full-screen network-picker modal and **crashed Nickel into a reboot**;
+   reboot-as-recovery stays forbidden for that crash itself (dropbear now
+   boot-persists, so lost dev SSH is no longer the reason). Note two WiFi
    states: a _disabled_ radio can't be silently recovered, but the real-world
    state the agent faces is _enabled-but-disconnected_ (Nickel's battery-timer
    drop), which the silent path drives. Full probe results: `docs/agent-build-plan.md`
@@ -141,17 +142,27 @@ and an un-checkpointed WAL. The `calibre:N` literal is a format string, not data
 Full detail in `docs/agent-build-plan.md` (Step 0; local-only, gitignored).
 Essentials:
 
-- **SSH:** custom dropbear, passwordless dev auth. Persistent master:
+- **SSH:** custom dropbear. Dev **key auth (pubkey)** works and survives reboot
+  (see _Boot-persistent SSH_ below). Persistent master:
   `ssh -M -S /tmp/kobo-ssh-master … root@<ip>`, then
-  `ssh -S /tmp/kobo-ssh-master root@<ip> '<cmd>'`.
+  `ssh -S /tmp/kobo-ssh-master root@<ip> '<cmd>'`. (Device IP/MAC + the full SSH
+  auth mechanism are in the build plan — local-only.)
 - **No `sftp-server`** → scp fails. Transfer via cat-pipe:
   `ssh -S "$CM" root@<ip> 'cat > /path' < localfile`.
 - **WiFi drops by design** — Nickel powers the radio down on a battery timer,
-  ignoring traffic. Dev workaround: `ForceWifiOn=true` under
-  `[DeveloperSettings]` in `Kobo eReader.conf`. The product agent (Step 3) must
-  sync opportunistically on WiFi-up windows, never assume a standing link.
-- **Not boot-persistent yet:** dropbear dies on reboot — re-run the NickelMenu
-  "SSH open" item. IP may change; re-check.
+  ignoring traffic. Dev workaround: set `ForceWifiOn=true` under
+  `[DeveloperSettings]` in `Kobo eReader.conf` — **edit it over SSH** (the file is
+  on `/mnt/onboard`, mounted rw; it is NOT USB-only), then **reboot to load**
+  (Nickel reads the conf only at startup). The product agent (Step 3) must sync
+  opportunistically on WiFi-up windows, never assume a standing link.
+- **Boot-persistent SSH (verified 2026-06-08 by a real reboot test):** dropbear
+  auto-starts on boot (rootfs udev `loop0` rule → `on-boot.sh`, started key-only)
+  **and dev key auth survives reboot — no NickelMenu "SSH open" re-tap needed.**
+  This took a one-time `chown 0:0 /` fix: `/` shipped owned by uid 501, which
+  silently failed dropbear's pubkey home-ownership check, so before the fix every
+  key was rejected and the tap WAS required (the tap blanks root's password +
+  restarts `dropbear -B`). Device IP has been stable across reboots (DHCP lease,
+  same MAC). Full mechanism + IP/MAC: build plan (local-only).
 - **On-device path:** `/mnt/onboard/.adds/librito/agent`.
 - **Local round-trip:** the device hits the Mac's dev server over LAN, so run
   `npm run dev -- --host` (not localhost-only) and point `--url` at the Mac's
