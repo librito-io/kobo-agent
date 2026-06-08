@@ -16,6 +16,13 @@ user-facing product (the agent, `../nm/librito`, `../udev/*`) is separate.
 Device-specific secrets (the device IP/MAC, DHCP reservation) live in the
 local-only build plan (`docs/agent-build-plan.md`, gitignored), **not here**.
 
+> **Maintainers:** after any substantive edit to this runbook, re-audit it from a
+> _cold context_ — a fresh agent/contributor with **no** device knowledge and **no**
+> build plan, walking it as a literal executor (see the prompt that built this doc).
+> Whoever wrote the change can't see its blind spots; two cold passes here each
+> caught real first-touch traps (ownership clobber, macOS `._` pollution, SSH
+> host-key verification) that the author missed. Cheap, high-yield.
+
 ## What's in here
 
 | File                    | Installs to                                | Purpose                                                                         |
