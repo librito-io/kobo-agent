@@ -10,8 +10,12 @@ import (
 func deps(l *fakeLocker, cfg fakeConfig, p *fakeProber, s *fakeSyncer, lg *fakeLogger, clk *fakeClock) Deps {
 	return Deps{
 		Locker: l, Config: cfg, Prober: p, Syncer: s, Logger: lg, Clock: clk,
-		Timeout: 60 * time.Second,
-		Cadence: 2 * time.Second,
+		Record:     &fakeRecordStore{},
+		ViewProber: fakeViewProber{view: "home"},
+		Toaster:    &fakeToaster{},
+		ToastAllow: []string{"home"},
+		Timeout:    60 * time.Second,
+		Cadence:    2 * time.Second,
 	}
 }
 
@@ -23,10 +27,10 @@ func TestRun_HappyPath(t *testing.T) {
 	lg := &fakeLogger{}
 	clk := newFakeClock()
 
-	code := Run(deps(l, cfg, p, s, lg, clk))
+	out := Run(deps(l, cfg, p, s, lg, clk))
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if out != OutcomeSynced {
+		t.Fatalf("outcome = %d, want OutcomeSynced", out)
 	}
 	if s.calls != 1 || s.gotURL != "http://dev:5173" || s.gotToken != "sk_device_x" {
 		t.Fatalf("syncer call wrong: calls=%d url=%q token=%q", s.calls, s.gotURL, s.gotToken)
@@ -43,10 +47,10 @@ func TestRun_LockHeld_NoOpExitZero(t *testing.T) {
 	l := &fakeLocker{ok: false} // another run holds it
 	s := &fakeSyncer{}
 	lg := &fakeLogger{}
-	code := Run(deps(l, fakeConfig{token: "tok"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: "tok"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0 (quiet dedup)", code)
+	if out != OutcomeDedup {
+		t.Fatalf("outcome = %d, want OutcomeDedup", out)
 	}
 	if s.calls != 0 {
 		t.Fatal("must not sync when the lock is held")
@@ -60,10 +64,10 @@ func TestRun_LockError_ExitNonzero(t *testing.T) {
 	l := &fakeLocker{err: errors.New("flock: permission denied")}
 	s := &fakeSyncer{}
 	lg := &fakeLogger{}
-	code := Run(deps(l, fakeConfig{token: "tok"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: "tok"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
 
-	if code == 0 {
-		t.Fatal("exit code = 0, want nonzero on lock error")
+	if out != OutcomeLockErr {
+		t.Fatalf("outcome = %d, want OutcomeLockErr", out)
 	}
 	if s.calls != 0 {
 		t.Fatal("must not sync on lock error")
@@ -77,10 +81,10 @@ func TestRun_NoToken_ExitZeroNoSync(t *testing.T) {
 	l := &fakeLocker{ok: true}
 	s := &fakeSyncer{}
 	lg := &fakeLogger{}
-	code := Run(deps(l, fakeConfig{token: ""}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: ""}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0 (unpaired no-op)", code)
+	if out != OutcomeUnpaired {
+		t.Fatalf("outcome = %d, want OutcomeUnpaired", out)
 	}
 	if s.calls != 0 {
 		t.Fatal("unpaired device must not POST")
@@ -98,10 +102,10 @@ func TestRun_NotReadyTimeout_ExitNonzero(t *testing.T) {
 	s := &fakeSyncer{}
 	lg := &fakeLogger{}
 	p := &fakeProber{snaps: []Snapshot{notReady()}} // never ready
-	code := Run(deps(l, fakeConfig{token: "tok"}, p, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: "tok"}, p, s, lg, newFakeClock()))
 
-	if code == 0 {
-		t.Fatal("exit code = 0, want nonzero on connectivity timeout")
+	if out != OutcomeOffline {
+		t.Fatalf("outcome = %d, want OutcomeOffline", out)
 	}
 	if s.calls != 0 {
 		t.Fatal("must not sync when connectivity never came up")
@@ -115,10 +119,10 @@ func TestRun_SyncError_ExitNonzero(t *testing.T) {
 	l := &fakeLocker{ok: true}
 	s := &fakeSyncer{err: errors.New("post import: dial tcp: timeout")}
 	lg := &fakeLogger{}
-	code := Run(deps(l, fakeConfig{token: "tok", baseURL: "http://dev:5173"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: "tok", baseURL: "http://dev:5173"}, &fakeProber{snaps: []Snapshot{ready()}}, s, lg, newFakeClock()))
 
-	if code == 0 {
-		t.Fatal("exit code = 0, want nonzero on sync error")
+	if out != OutcomeError {
+		t.Fatalf("outcome = %d, want OutcomeError", out)
 	}
 	if len(lg.lines) != 1 || !strings.Contains(lg.lines[0], "post import") {
 		t.Fatalf("want the sync error logged, got %v", lg.lines)
@@ -130,15 +134,68 @@ func TestRun_WaitsThenSyncs(t *testing.T) {
 	s := &fakeSyncer{imported: 6, books: 6}
 	lg := &fakeLogger{}
 	p := &fakeProber{snaps: []Snapshot{notReady(), notReady(), ready()}}
-	code := Run(deps(l, fakeConfig{token: "tok"}, p, s, lg, newFakeClock()))
+	out := Run(deps(l, fakeConfig{token: "tok"}, p, s, lg, newFakeClock()))
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if out != OutcomeSynced {
+		t.Fatalf("outcome = %d, want OutcomeSynced", out)
 	}
 	if p.calls != 3 {
 		t.Fatalf("probed %d times, want 3 (waited for the up-edge)", p.calls)
 	}
 	if s.calls != 1 {
 		t.Fatal("want exactly one sync after connectivity came up")
+	}
+}
+
+func TestRun_HappyPath_RecordsSuccessAndToastsAtHome(t *testing.T) {
+	rec := &fakeRecordStore{}
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 1, books: 1},
+		&fakeLogger{}, newFakeClock())
+	d.Record = rec
+	d.Toaster = tst
+	// deps() already sets ViewProber to the home view (allow-listed).
+
+	Run(d)
+
+	if len(rec.got) != 1 || rec.got[0] != OutcomeSynced {
+		t.Fatalf("record calls = %v, want [Synced]", rec.got)
+	}
+	if len(tst.mains) != 1 {
+		t.Fatalf("want one toast at home, got %v", tst.mains)
+	}
+}
+
+func TestRun_SuppressesToastWhileReading(t *testing.T) {
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 1, books: 1},
+		&fakeLogger{}, newFakeClock())
+	d.Toaster = tst
+	d.ViewProber = fakeViewProber{view: "reading"}
+
+	Run(d)
+
+	if len(tst.mains) != 0 {
+		t.Fatalf("must not toast while reading, got %v", tst.mains)
+	}
+}
+
+func TestRun_OfflineRecordsOffline_DedupRecordsNothing(t *testing.T) {
+	recOff := &fakeRecordStore{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t"},
+		&fakeProber{snaps: []Snapshot{notReady()}}, &fakeSyncer{}, &fakeLogger{}, newFakeClock())
+	d.Record = recOff
+	if Run(d); len(recOff.got) != 1 || recOff.got[0] != OutcomeOffline {
+		t.Fatalf("offline record = %v, want [Offline]", recOff.got)
+	}
+
+	recDup := &fakeRecordStore{}
+	d2 := deps(&fakeLocker{ok: false}, fakeConfig{token: "t"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{}, &fakeLogger{}, newFakeClock())
+	d2.Record = recDup
+	if Run(d2); len(recDup.got) != 0 {
+		t.Fatalf("dedup must record nothing, got %v", recDup.got)
 	}
 }

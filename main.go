@@ -146,7 +146,7 @@ func runAutosync(argv []string) int {
 		Clock:   realClock{},
 		Timeout: 60 * time.Second,
 		Cadence: 2 * time.Second,
-	})
+	}).ExitCode()
 }
 
 // runWatch runs the resident watcher daemon (or, with --probe, the inotify spike).

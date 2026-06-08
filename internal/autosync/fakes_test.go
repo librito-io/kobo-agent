@@ -73,3 +73,18 @@ func (s *fakeSyncer) Sync(baseURL, token string) (int, int, error) {
 type fakeLogger struct{ lines []string }
 
 func (l *fakeLogger) Log(line string) { l.lines = append(l.lines, line) }
+
+// fakeRecordStore records the outcomes Record was called with.
+type fakeRecordStore struct{ got []Outcome }
+
+func (s *fakeRecordStore) Record(o Outcome) { s.got = append(s.got, o) }
+
+// fakeViewProber returns a scripted view string.
+type fakeViewProber struct{ view string }
+
+func (p fakeViewProber) CurrentView() string { return p.view }
+
+// fakeToaster records toast calls.
+type fakeToaster struct{ mains []string }
+
+func (t *fakeToaster) Toast(main, sub string) { t.mains = append(t.mains, main) }
