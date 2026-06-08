@@ -139,14 +139,17 @@ and an un-checkpointed WAL. The `calibre:N` literal is a format string, not data
 
 ## Dev backbone (on-hardware loop)
 
-Full detail in `docs/agent-build-plan.md` (Step 0; local-only, gitignored).
-Essentials:
+The runnable dev harness is version-controlled: **`dev/README.md`** is the
+committed runbook (SSH/dropbear boot stack, dev NickelMenu, `chown 0:0 /` fix,
+`ForceWifiOn`) with the reference config files in `dev/`. **Device-specific
+secrets** (IP/MAC/DHCP reservation) + the verified on-hardware findings stay in
+`docs/agent-build-plan.md` (Step 0; local-only, gitignored). Essentials:
 
 - **SSH:** custom dropbear. Dev **key auth (pubkey)** works and survives reboot
   (see _Boot-persistent SSH_ below). Persistent master:
   `ssh -M -S /tmp/kobo-ssh-master … root@<ip>`, then
-  `ssh -S /tmp/kobo-ssh-master root@<ip> '<cmd>'`. (Device IP/MAC + the full SSH
-  auth mechanism are in the build plan — local-only.)
+  `ssh -S /tmp/kobo-ssh-master root@<ip> '<cmd>'`. (Full bring-up procedure:
+  `dev/README.md`. Device IP/MAC: build plan — local-only.)
 - **No `sftp-server`** → scp fails. Transfer via cat-pipe:
   `ssh -S "$CM" root@<ip> 'cat > /path' < localfile`.
 - **WiFi drops by design** — Nickel powers the radio down on a battery timer,
