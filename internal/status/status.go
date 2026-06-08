@@ -69,3 +69,22 @@ func DecideSyncResult(o autosync.Outcome) string {
 		return "Couldn't reach Librito right now"
 	}
 }
+
+// AboutLines builds the `agent about` output. Pure so the token gating, the
+// RFC3339 parse→"Jan 2, 2006" format, and the line-omission rules are
+// table-tested — the main.go glue is then just file reads + printing. An empty
+// or unparseable pairedAt drops the "Paired" line rather than showing a bogus
+// date; an empty email is omitted. Unpaired short-circuits to a single line.
+func AboutLines(hasToken bool, email, pairedAt, version string) []string {
+	if !hasToken {
+		return []string{"Not paired"}
+	}
+	var lines []string
+	if email != "" {
+		lines = append(lines, email)
+	}
+	if t, err := time.Parse(time.RFC3339, pairedAt); err == nil {
+		lines = append(lines, "Paired "+t.Format("Jan 2, 2006"))
+	}
+	return append(lines, "Librito agent "+version)
+}

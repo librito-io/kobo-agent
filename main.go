@@ -258,21 +258,14 @@ func runAbout(argv []string) int {
 	dir := fs.String("dir", adsDir, "directory holding the account files")
 	_ = fs.Parse(argv)
 
-	if resolveToken("", "", filepath.Join(*dir, "token")) == "" {
-		fmt.Println("Not paired")
-		return 0
+	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
+	lines := status.AboutLines(hasToken,
+		readTrim(filepath.Join(*dir, "email")),
+		readTrim(filepath.Join(*dir, "paired-at")),
+		version)
+	for _, l := range lines {
+		fmt.Println(l)
 	}
-	email := readTrim(filepath.Join(*dir, "email"))
-	pairedAt := readTrim(filepath.Join(*dir, "paired-at"))
-	if email != "" {
-		fmt.Println(email)
-	}
-	if pairedAt != "" {
-		if t, err := time.Parse(time.RFC3339, pairedAt); err == nil {
-			fmt.Println("Paired " + t.Format("Jan 2, 2006"))
-		}
-	}
-	fmt.Println("Librito agent " + version)
 	return 0
 }
 

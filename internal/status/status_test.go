@@ -1,11 +1,36 @@
 package status
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/librito-io/kobo-agent/internal/autosync"
 )
+
+func TestAboutLines(t *testing.T) {
+	cases := []struct {
+		name     string
+		hasToken bool
+		email    string
+		pairedAt string
+		version  string
+		want     []string
+	}{
+		{"not paired wins", false, "me@x.co", "2026-06-08T12:00:00Z", "0.9.0", []string{"Not paired"}},
+		{"full", true, "me@x.co", "2026-06-08T12:00:00Z", "0.9.0", []string{"me@x.co", "Paired Jun 8, 2026", "Librito agent 0.9.0"}},
+		{"missing email omitted", true, "", "2026-06-08T12:00:00Z", "0.9.0", []string{"Paired Jun 8, 2026", "Librito agent 0.9.0"}},
+		{"unparseable paired-at dropped", true, "me@x.co", "not-a-date", "0.9.0", []string{"me@x.co", "Librito agent 0.9.0"}},
+		{"empty paired-at dropped", true, "me@x.co", "", "dev", []string{"me@x.co", "Librito agent dev"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := AboutLines(c.hasToken, c.email, c.pairedAt, c.version); !slices.Equal(got, c.want) {
+				t.Errorf("AboutLines = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
 
 func ptr(s string) *time.Time { t, _ := time.Parse(time.RFC3339, s); return &t }
 
