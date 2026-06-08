@@ -39,10 +39,12 @@ else
   chown 0:0 /
   echo "/ chowned to 0:0"
 fi
-# fix key ownership/perms
+# fix key ownership/perms. authorized_keys may not be planted yet (ssh-key.sh
+# does that next) — guard the chmod so a fresh run doesn't error on a missing file.
+mkdir -p /.ssh
 chown -R root:root /.ssh 2>/dev/null
 chmod 700 /.ssh
-chmod 600 /.ssh/authorized_keys
+[ -f /.ssh/authorized_keys ] && chmod 600 /.ssh/authorized_keys
 # generate host key if absent, then start
 [ -f "$KEY" ] || /usr/local/bin/dropbearkey -t ed25519 -f "$KEY" >>"$LOG" 2>&1
 case "$(pidof dropbear | wc -w)" in

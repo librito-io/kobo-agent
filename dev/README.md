@@ -85,6 +85,9 @@ firmware drift silently invalidates this whole recipe. So, first:
 1. **Complete Nickel onboarding and join your WiFi.** A factory-reset Libra Colour
    boots into the activation wizard — go through it and connect to the same network
    as your dev machine. SSH-over-LAN below assumes the device is reachable.
+   ⚠️ Activation may require signing into (or creating) a Kobo account before it
+   will finish and mount the USB partition; have one ready. The device must reach
+   "Home" at least once so it processes the `.kobo/*.tgz` you drop in the next step.
 2. **🛑 Do NOT let it firmware-update.** This recipe is verified on Nickel
    4.45.23697 only (see the banner). If the wizard offers an OTA, decline it; after
    setup, confirm auto-update is OFF (Settings → Device information → Automatic
@@ -105,7 +108,10 @@ Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
    yours differs). Drop **three** renamed tgz files into
    `/Volumes/KOBOeReader/.kobo/`: the prebuilt dropbear tgz, the NickelMenu tgz, and
    the NickelDBus tgz (URLs + the rename-so-they-don't-collide note are above). Eject;
-   the device unpacks each on boot and deletes the tgz.
+   the device unpacks each on boot and deletes the tgz. (Dropbear + NickelMenu are
+   required for SSH; **NickelDBus is not load-bearing for the SSH harness** — only
+   the dev menu's "NDB Test toast" smoke item and later on-device UI use it. Skip it
+   if you only want a shell.)
 2. **Place the dev files via USB** onto the user partition:
    - `nm-config` → `/Volumes/KOBOeReader/.adds/nm/config`
    - `ssh/ssh-open.sh` → `/Volumes/KOBOeReader/.adds/librito/ssh-open.sh`
@@ -131,7 +137,9 @@ Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
    # IP: from the "SSH open" dialog, or your router's DHCP table, or match the
    #   device's wlan0 MAC against the ARP table: arp -a | grep -i <your-mac-prefix>
    CM=/tmp/kobo-ssh-master; IP=<device-ip>
-   ssh -M -S "$CM" -o ServerAliveInterval=10 -fN root@$IP
+   # first connect from a new machine has no known_hosts entry → accept-new (or
+   # the later BatchMode call hard-fails "Host key verification failed")
+   ssh -M -S "$CM" -o ServerAliveInterval=10 -o StrictHostKeyChecking=accept-new -fN root@$IP
    S(){ ssh -S "$CM" root@$IP "$@"; }
 
    # push the scripts (no sftp-server on device → cat-pipe everything)
@@ -145,7 +153,8 @@ Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
    S "LIBRITO_DEV_PUBKEY='$(cat ~/.ssh/id_ed25519.pub)' sh /mnt/onboard/.adds/librito/ssh-key.sh"
    ```
 
-6. **Reboot and confirm key-only auth with no tap:**
+6. **Reboot and confirm key-only auth with no tap** (the host key is already in
+   `known_hosts` from step 5, so BatchMode won't trip on it):
    ```sh
    ssh -o BatchMode=yes root@$IP 'id; ls -ld /'   # expect uid=0, / owned by root
    ```
@@ -185,8 +194,11 @@ link; it syncs opportunistically on WiFi-up windows (build plan Step 3).
 
 ## Daily loop cheatsheet
 
+Build the agent first (`CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build …` —
+see the repo root CLAUDE.md "Build & test"). Then, from the repo root:
+
 ```sh
-CM=/tmp/kobo-ssh-master; IP=<device-ip from build plan>
+CM=/tmp/kobo-ssh-master; IP=<device-ip>   # the IP from bring-up (lease is stable)
 ssh -M -S "$CM" -o ServerAliveInterval=10 -fN root@$IP   # one auth, reused
 S(){ ssh -S "$CM" root@$IP "$@"; }
 
