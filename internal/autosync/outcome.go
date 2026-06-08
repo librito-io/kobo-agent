@@ -27,12 +27,15 @@ func (o Outcome) ExitCode() int {
 
 // defaultToastAllow is the allowlist of ndbCurrentView() strings on which the
 // post-sync toast may fire. ALLOWLIST (not denylist): an unknown/new view → no
-// toast, so the gate fails SAFE (never a banner over a book). Start with home only.
+// toast, so the gate fails SAFE (never a banner over a book).
 //
-// ⚠ HARDWARE-OWED (spec Owed #2): "home" is a best guess — replace with the exact
-// ndbCurrentView() return string for the home screen once verified on-device. A
-// wrong value only suppresses toasts; it can never fire one over a book.
-var defaultToastAllow = []string{"home"}
+// Verified on-device (Kobo Libra Colour, Nickel 4.45, NDB 0.2.0, 2026-06-08):
+// ndbCurrentView() returns "HomePageView" on the home screen and "ReadingView" in
+// a book — both confirmed by firing an autosync on each (toast fired on home,
+// suppressed in the book). The allowlist fires the toast on home and excludes
+// every other view, so a changed/unknown view string can only drop a toast, never
+// plant one over a page.
+var defaultToastAllow = []string{"HomePageView"}
 
 // ShouldToast reports whether a post-sync toast may fire on the given view.
 func ShouldToast(view string, allow []string) bool {
