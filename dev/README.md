@@ -18,15 +18,15 @@ local-only build plan (`docs/agent-build-plan.md`, gitignored), **not here**.
 
 ## What's in here
 
-| File                    | Installs to                                | Purpose                                                         |
-| ----------------------- | ------------------------------------------ | --------------------------------------------------------------- |
-| `ssh/96-dropbear.rules` | `/etc/udev/rules.d/` (rootfs)              | boot trigger on `loop0` → launcher                              |
-| `ssh/boot.sh`           | `/usr/local/dropbear/` (rootfs)            | udev launcher; `setsid`-detaches so udev can't reap dropbear    |
-| `ssh/on-boot.sh`        | `/usr/local/dropbear/` (rootfs)            | starts dropbear **key-only** (`-s -g`); idempotent              |
-| `ssh/ssh-key.sh`        | run once                                   | plants your pubkey (`$LIBRITO_DEV_PUBKEY`) into root's `~/.ssh` |
-| `ssh/ssh-fix.sh`        | run once                                   | repairs `on-boot.sh` (strips bad `-E`) + `/.ssh` perms          |
-| `ssh/ssh-open.sh`       | `/mnt/onboard/.adds/librito/` (user part.) | NickelMenu blank-password recovery hatch                        |
-| `nm-config`             | `/mnt/onboard/.adds/nm/config`             | dev NickelMenu (SSH open/diag + smoke tests)                    |
+| File                    | Installs to                                | Purpose                                                                         |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `ssh/96-dropbear.rules` | `/etc/udev/rules.d/` (rootfs)              | boot trigger on `loop0` → launcher                                              |
+| `ssh/boot.sh`           | `/usr/local/dropbear/` (rootfs)            | udev launcher; `setsid`-detaches so udev can't reap dropbear                    |
+| `ssh/on-boot.sh`        | `/usr/local/dropbear/` (rootfs)            | starts dropbear **key-only** (`-s -g`); idempotent                              |
+| `ssh/ssh-key.sh`        | run once                                   | plants your pubkey (`$LIBRITO_DEV_PUBKEY`) into root's `~/.ssh`                 |
+| `ssh/ssh-fix.sh`        | run once                                   | repairs `on-boot.sh` (strips bad `-E`), runs `chown 0:0 /`, fixes `/.ssh` perms |
+| `ssh/ssh-open.sh`       | `/mnt/onboard/.adds/librito/` (user part.) | NickelMenu blank-password recovery hatch                                        |
+| `nm-config`             | `/mnt/onboard/.adds/nm/config`             | dev NickelMenu (SSH open/diag + smoke tests)                                    |
 
 **Not in version control (yet):** the cross-compiled `dropbear` + `dropbearkey`
 binaries and the self-installing `KoboRoot.tgz`. On a fresh device the scripts
@@ -55,8 +55,10 @@ Root's home directory is `/` on this device. dropbear's strict pubkey check
 requires the home dir to be owned by root — and `/` **shipped owned by uid 501**,
 so the key-only path silently rejected every key (log: `/ must be owned by user
 or root... Exit before auth`). That is why earlier sessions kept needing the "SSH
-open" tap. One-time fix, persists like the rootfs rules (reversible with
-`chown 501:root /`):
+open" tap. One-time, non-recursive, idempotent; persists like the rootfs rules
+(reversible with `chown 501:root /`). **`ssh-fix.sh` runs this for you** — it is
+documented here because the _why_ is load-bearing institutional knowledge, not
+because you must run it by hand:
 
 ```sh
 chown 0:0 /
@@ -85,14 +87,15 @@ Chicken-and-egg: you can't SSH in to set up SSH. The first touch is manual.
    ssh -M -S "$CM" -o ServerAliveInterval=10 -fN root@$IP
    S(){ ssh -S "$CM" root@$IP "$@"; }
 
-   # plant your key (no sftp-server on device → cat-pipe everything)
+   # push the scripts (no sftp-server on device → cat-pipe everything)
    S 'cat > /mnt/onboard/.adds/librito/ssh-key.sh' < ssh/ssh-key.sh
    S 'cat > /mnt/onboard/.adds/librito/ssh-fix.sh' < ssh/ssh-fix.sh
-   S "LIBRITO_DEV_PUBKEY='$(cat ~/.ssh/id_ed25519.pub)' sh /mnt/onboard/.adds/librito/ssh-fix.sh"
-   S "LIBRITO_DEV_PUBKEY='$(cat ~/.ssh/id_ed25519.pub)' sh /mnt/onboard/.adds/librito/ssh-key.sh"
 
-   # the load-bearing fix
-   S 'chown 0:0 /'
+   # repair on-boot.sh + run the load-bearing chown 0:0 / + fix /.ssh perms
+   S 'sh /mnt/onboard/.adds/librito/ssh-fix.sh'
+
+   # plant your pubkey for key-only auth
+   S "LIBRITO_DEV_PUBKEY='$(cat ~/.ssh/id_ed25519.pub)' sh /mnt/onboard/.adds/librito/ssh-key.sh"
    ```
 
 6. **Reboot and confirm key-only auth with no tap:**
