@@ -8,6 +8,9 @@
 //	librito-kobo-agent pair         pair this device (writes hardware-id + token)
 //	librito-kobo-agent autosync     triggered sync (udev WiFi-up); token + url from files
 //	librito-kobo-agent watch        resident daemon: immediate sync on a new highlight while connected
+//	librito-kobo-agent status       print the last-sync status line
+//	librito-kobo-agent about        print pairing info + agent version
+//	librito-kobo-agent sync-now     run a one-shot sync with feedback (for NickelMenu)
 package main
 
 import (
@@ -21,6 +24,7 @@ import (
 
 	"github.com/librito-io/kobo-agent/internal/autosync"
 	"github.com/librito-io/kobo-agent/internal/pair"
+	"github.com/librito-io/kobo-agent/internal/status"
 	"github.com/librito-io/kobo-agent/internal/sync"
 	"github.com/librito-io/kobo-agent/internal/watch"
 )
@@ -28,6 +32,10 @@ import (
 // adsDir is where pairing persists hardware-id + token (co-located with the
 // binary on-device).
 const adsDir = "/mnt/onboard/.adds/librito"
+
+// version is the agent version, set at build time via -ldflags -X main.version.
+// The single source of truth surfaced by `agent about`.
+var version = "dev"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "pair" {
@@ -38,6 +46,15 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "watch" {
 		os.Exit(runWatch(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "status" {
+		os.Exit(runStatus(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "about" {
+		os.Exit(runAbout(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "sync-now" {
+		os.Exit(runSyncNow(os.Args[2:]))
 	}
 	os.Exit(runSync(os.Args[1:]))
 }
@@ -63,6 +80,7 @@ func runPair(argv []string) int {
 		WiFi:           pair.NewQndbWiFi(),
 		Store:          pair.NewFileStore(*dir, rand.Reader),
 		Clock:          realClock{},
+		WallNow:        time.Now,
 		DeviceModel:    deviceModel,
 		BaseURL:        *baseURL,
 		WiFiTimeout:    20 * time.Second,
@@ -135,18 +153,25 @@ func runAutosync(argv []string) int {
 	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL when no url file is present (pairing writes the url file)")
 	lockPath := fs.String("lock", "/tmp/librito-autosync.lock", "single-instance lock path (tmpfs)")
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
 
 	return autosync.Run(autosync.Deps{
-		Locker:  autosync.NewFlockLocker(*lockPath),
-		Config:  autosync.NewFileConfig(*dir, *defaultURL),
-		Prober:  autosync.NewSysfsProber("wlan0"),
-		Syncer:  autosync.NewSyncer(*dbPath),
-		Logger:  autosync.NewFileLogger(*logPath, 64*1024),
-		Clock:   realClock{},
-		Timeout: 60 * time.Second,
-		Cadence: 2 * time.Second,
-	})
+		Locker:     autosync.NewFlockLocker(*lockPath),
+		Config:     autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:     autosync.NewSysfsProber("wlan0"),
+		Syncer:     autosync.NewSyncer(*dbPath),
+		Logger:     autosync.NewFileLogger(*logPath, 64*1024),
+		Clock:      realClock{},
+		Record:     autosync.NewFileRecordStore(*recordPath, time.Now),
+		ViewProber: autosync.NewQndbViewProber(),
+		Toaster:    autosync.NewQndbToaster("2000"),
+		Timeout:    60 * time.Second,
+		Cadence:    2 * time.Second,
+	}).ExitCode()
 }
 
 // runWatch runs the resident watcher daemon (or, with --probe, the inotify spike).
@@ -190,6 +215,9 @@ func runWatch(argv []string) int {
 	// Resident daemon. The sync delegates to autosync.Run with the SAME shared
 	// lock as the udev path (so they never double-run) but a SHORT timeout (we
 	// only sync when already connected). Single-instance via a SEPARATE watch lock.
+	// Record is wired (watch tracks last-sync) but ViewProber/Toaster are nil —
+	// suppressing the toast for the highlight-while-reading path is correct and
+	// avoids a qndb call per highlight.
 	runner := watch.NewRunner(autosync.Deps{
 		Locker:  autosync.NewFlockLocker(*syncLock),
 		Config:  autosync.NewFileConfig(*dir, *defaultURL),
@@ -197,6 +225,7 @@ func runWatch(argv []string) int {
 		Syncer:  autosync.NewSyncer(*dbPath),
 		Logger:  logger,
 		Clock:   realClock{},
+		Record:  autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
 		Timeout: 5 * time.Second,
 		Cadence: 2 * time.Second,
 	})
@@ -213,6 +242,85 @@ func runWatch(argv []string) int {
 		Window:    5 * time.Second,
 		Cap:       15 * time.Second,
 	})
+}
+
+func runStatus(argv []string) int {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	dir := fs.String("dir", adsDir, "directory holding the token + last-sync files")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
+	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
+
+	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
+	rec, _ := autosync.LoadRecord(*recordPath)
+	fmt.Println(status.DecideStatusLine(rec, time.Now(), hasToken))
+	return 0
+}
+
+func runAbout(argv []string) int {
+	fs := flag.NewFlagSet("about", flag.ExitOnError)
+	dir := fs.String("dir", adsDir, "directory holding the account files")
+	_ = fs.Parse(argv)
+
+	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
+	lines := status.AboutLines(hasToken,
+		readTrim(filepath.Join(*dir, "email")),
+		readTrim(filepath.Join(*dir, "paired-at")),
+		version)
+	for _, l := range lines {
+		fmt.Println(l)
+	}
+	return 0
+}
+
+func runSyncNow(argv []string) int {
+	fs := flag.NewFlagSet("sync-now", flag.ExitOnError)
+	dbPath := fs.String("db", "/mnt/onboard/.kobo/KoboReader.sqlite", "path to KoboReader.sqlite")
+	dir := fs.String("dir", adsDir, "directory holding the token + url files")
+	defaultURL := fs.String("url", "https://librito.io", "fallback API base URL")
+	lockPath := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock")
+	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "result log path")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
+	_ = fs.Parse(argv)
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
+	}
+
+	// 1. Best-effort "Syncing…" toast fills the cmd_output dead-gap (menu closes,
+	//    nothing on screen until we print). Separate from the in-Run success toast.
+	autosync.NewQndbToaster("4000").Toast("Syncing…", "")
+
+	// 2. Delegate to the shared engine with a SHORT timeout (no WiFi bring-up;
+	//    its own WaitForConnectivity fast-fails offline). No-op View/Toaster so the
+	//    in-Run success toast is suppressed — sync-now shows the result dialog instead.
+	out := autosync.Run(autosync.Deps{
+		Locker:     autosync.NewFlockLocker(*lockPath),
+		Config:     autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:     autosync.NewSysfsProber("wlan0"),
+		Syncer:     autosync.NewSyncer(*dbPath),
+		Logger:     autosync.NewFileLogger(*logPath, 64*1024),
+		Clock:      realClock{},
+		Record:     autosync.NewFileRecordStore(*recordPath, time.Now),
+		ViewProber: autosync.NewNoopViewProber(),
+		Toaster:    autosync.NewNoopToaster(),
+		Timeout:    5 * time.Second,
+		Cadence:    2 * time.Second,
+	})
+
+	// 3. Map the RETURNED outcome (never re-read the record) → result dialog text.
+	fmt.Println(status.DecideSyncResult(out))
+	return out.ExitCode()
+}
+
+// readTrim reads a small file, returning its trimmed contents or "".
+func readTrim(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }
 
 // resolveToken applies the precedence: flag > env > token file. A read error or

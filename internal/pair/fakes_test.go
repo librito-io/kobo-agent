@@ -17,6 +17,10 @@ type fakeStore struct {
 	tokenWrites int
 	url         string
 	urlWrites   int
+
+	accountEmail    string
+	accountPairedAt time.Time
+	accountWrites   int
 }
 
 func (s *fakeStore) LoadOrCreateHardwareID() (string, error) {
@@ -28,6 +32,12 @@ func (s *fakeStore) LoadOrCreateHardwareID() (string, error) {
 }
 func (s *fakeStore) WriteToken(t string) error { s.token = t; s.tokenWrites++; return nil }
 func (s *fakeStore) WriteURL(u string) error   { s.url = u; s.urlWrites++; return nil }
+func (s *fakeStore) WriteAccount(email string, pairedAt time.Time) error {
+	s.accountEmail = email
+	s.accountPairedAt = pairedAt
+	s.accountWrites++
+	return nil
+}
 
 // --- fakeWiFi: scripted connect result(s). ---
 type fakeWiFi struct {

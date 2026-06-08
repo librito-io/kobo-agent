@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// fileStore persists hardware-id + token under dir (production:
-// /mnt/onboard/.adds/librito/). Files are 0600; dir is created if missing.
-// .adds/ is USB-exported, so the token is world-readable to anyone who mounts
-// the device — the real protection is the SSH-hardening prereq (spec §Prereq).
+// fileStore persists hardware-id + token (+ account email + paired-at) under dir
+// (production: /mnt/onboard/.adds/librito/). Files are 0600; dir is created if
+// missing. .adds/ is USB-exported, so the token AND the account email/paired-at
+// are world-readable to anyone who mounts the device — the real protection is the
+// SSH-hardening prereq (spec §Prereq).
 type fileStore struct {
 	dir string
 	rnd io.Reader // random source for hardware-id generation (crypto/rand in prod)
@@ -47,6 +49,13 @@ func (s *fileStore) WriteToken(token string) error {
 
 func (s *fileStore) WriteURL(url string) error {
 	return s.write(filepath.Join(s.dir, "url"), url)
+}
+
+func (s *fileStore) WriteAccount(email string, pairedAt time.Time) error {
+	if err := s.write(filepath.Join(s.dir, "email"), email); err != nil {
+		return err
+	}
+	return s.write(filepath.Join(s.dir, "paired-at"), pairedAt.UTC().Format(time.RFC3339))
 }
 
 func (s *fileStore) write(path, content string) error {

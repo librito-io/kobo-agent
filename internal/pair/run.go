@@ -10,6 +10,10 @@ type Deps struct {
 	Store   Store
 	Clock   Clock
 
+	// WallNow supplies CALENDAR time for the paired-at stamp. Distinct from Clock
+	// (which is monotonic, for TTL bounds). main passes time.Now.
+	WallNow func() time.Time
+
 	DeviceModel    string        // human-legible model sent on every pair request (devices.model)
 	BaseURL        string        // backend the device paired against; persisted for autosync (Step 3)
 	WiFiTimeout    time.Duration // bounded wait for wmNetworkConnected (~20s)
@@ -120,6 +124,9 @@ func pollLoop(d Deps, pr PairRequest, t0 time.Time) (Result, bool) {
 			if err := d.Store.WriteToken(st.Token); err != nil {
 				d.Display.UpdateError("could not save token")
 				return Result{Status: ResultFatal}, false
+			}
+			if d.WallNow != nil {
+				_ = d.Store.WriteAccount(st.UserEmail, d.WallNow())
 			}
 			d.Display.UpdatePaired(st.UserEmail)
 			d.Clock.Sleep(d.PollEvery) // let "Paired ✓" linger a beat before Close

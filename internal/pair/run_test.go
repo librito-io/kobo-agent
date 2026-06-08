@@ -23,7 +23,10 @@ func TestRun_HappyPath(t *testing.T) {
 		statusSteps: []statusStep{{out: OutcomeWaiting}, {st: PairStatus{Paired: true, Token: "sk_device_x", UserEmail: "a@b.co"}, out: OutcomePaired}},
 	}
 	d, w, s, clk := &fakeDisplay{}, &fakeWiFi{}, &fakeStore{}, newFakeClock()
-	res := Run(deps(c, d, w, s, clk))
+	fixedNow := time.Date(2026, 6, 8, 12, 0, 0, 0, time.UTC)
+	dd := deps(c, d, w, s, clk)
+	dd.WallNow = func() time.Time { return fixedNow }
+	res := Run(dd)
 
 	if res.Status != ResultPaired {
 		t.Fatalf("result = %v, want ResultPaired", res.Status)
@@ -39,6 +42,12 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 	if !d.closed {
 		t.Fatal("dialog not closed at end")
+	}
+	if s.accountWrites != 1 || s.accountEmail != "a@b.co" {
+		t.Fatalf("account not written: email=%q writes=%d", s.accountEmail, s.accountWrites)
+	}
+	if !s.accountPairedAt.Equal(fixedNow) {
+		t.Fatalf("account paired-at = %v, want %v", s.accountPairedAt, fixedNow)
 	}
 	// pollSecret threaded on EVERY status call.
 	for i, sec := range c.seenSecrets {

@@ -22,11 +22,12 @@ repo's API contract**. A session working only in this repo must know:
   is there, not here.** The catalog/cover resolver (which consumes the ISBN the
   agent sends) also lives in web.
 - **`librito-io/reader`** — the PaperS3 ESP32 firmware (C++/PlatformIO). Shares
-  **no code** with this agent. Holds the Kobo build plan + device facts at
-  `docs/kobo/agent-build-plan.md`, and a reference epub-OPF ISBN parser
+  **no code** with this agent. Holds a reference epub-OPF ISBN parser
   (`src/content/epub/EpubReader.cpp::parseIsbnFromOpf`) worth porting (see #503).
 - **`librito-io/kobo-agent`** (this repo) — the Kobo companion. A _client_ of
-  the web API, the same way the PaperS3 firmware and a browser are.
+  the web API, the same way the PaperS3 firmware and a browser are. The Kobo
+  build plan + device facts live **here** in `docs/agent-build-plan.md`
+  (local-only, gitignored — keeps device/dev specifics out of the public repo).
 
 The Kobo is char-offset / chapter-path based, not word-index based. It is a
 **separate write path** from the PaperS3's `/api/sync` (`processSync`); imported
@@ -114,8 +115,9 @@ Requires Go 1.24+.
 
 ```sh
 # static cross-compile for the Kobo (armv7l hard-float) — no C toolchain
+# -X main.version stamps the version surfaced by `agent about` (single origin).
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
-  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-agent-armv7 .
+  go build -trimpath -ldflags="-s -w -X main.version=0.9.0" -o dist/librito-kobo-agent-armv7 .
 
 go test ./...
 ```
@@ -136,7 +138,7 @@ and an un-checkpointed WAL. The `calibre:N` literal is a format string, not data
 
 ## Dev backbone (on-hardware loop)
 
-Full detail in `librito-io/reader` `docs/kobo/agent-build-plan.md` (Step 0).
+Full detail in `docs/agent-build-plan.md` (Step 0; local-only, gitignored).
 Essentials:
 
 - **SSH:** custom dropbear, passwordless dev auth. Persistent master:

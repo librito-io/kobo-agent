@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestStore_LoadOrCreateHardwareID_GeneratesThenReuses(t *testing.T) {
@@ -52,6 +54,23 @@ func TestStore_LoadOrCreateHardwareID_RejectsCorruptFile(t *testing.T) {
 	}
 	if !ValidateHardwareID(id) {
 		t.Fatalf("did not regenerate a valid id, got %q", id)
+	}
+}
+
+func TestFileStore_WriteAccount(t *testing.T) {
+	dir := t.TempDir()
+	s := NewFileStore(dir, strings.NewReader(strings.Repeat("a", 64)))
+	at := time.Date(2026, 6, 8, 12, 0, 0, 0, time.UTC)
+	if err := s.WriteAccount("nathan@icloud.com", at); err != nil {
+		t.Fatal(err)
+	}
+	email, _ := os.ReadFile(filepath.Join(dir, "email"))
+	if strings.TrimSpace(string(email)) != "nathan@icloud.com" {
+		t.Fatalf("email file = %q", email)
+	}
+	paired, _ := os.ReadFile(filepath.Join(dir, "paired-at"))
+	if strings.TrimSpace(string(paired)) != at.Format(time.RFC3339) {
+		t.Fatalf("paired-at file = %q", paired)
 	}
 }
 
