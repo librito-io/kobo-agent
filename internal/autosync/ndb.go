@@ -16,6 +16,14 @@ type Toaster interface {
 	Toast(main, sub string)
 }
 
+// qndbBin is the absolute path to NickelDBus's qndb CLI. It MUST be absolute:
+// the WiFi-up autosync is launched by udev, and udev spawns RUN children with NO
+// PATH in their environment. A bare "qndb" would fail exec.LookPath there, so the
+// view probe and the toast would silently no-op — the (real) reason the Step-4
+// post-sync toast never fired on the wake/udev path, even though the PATH-free
+// Go-HTTP sync still ran. /usr/bin/qndb is NDB's fixed on-device install location.
+const qndbBin = "/usr/bin/qndb"
+
 // qndbViewProber calls `qndb -m ndbCurrentView` (a GETTER in NDB 0.2.0) and returns
 // its trimmed stdout. Any failure → "" (ShouldToast then fails safe → no toast).
 type qndbViewProber struct{}
@@ -24,7 +32,7 @@ type qndbViewProber struct{}
 func NewQndbViewProber() ViewProber { return qndbViewProber{} }
 
 func (qndbViewProber) CurrentView() string {
-	out, err := exec.Command("qndb", "-m", "ndbCurrentView").Output()
+	out, err := exec.Command(qndbBin, "-m", "ndbCurrentView").Output()
 	if err != nil {
 		return ""
 	}
@@ -39,7 +47,7 @@ type qndbToaster struct{ durationMs string }
 func NewQndbToaster(durationMs string) Toaster { return qndbToaster{durationMs: durationMs} }
 
 func (t qndbToaster) Toast(main, sub string) {
-	_ = exec.Command("qndb", "-m", "mwcToast", t.durationMs, main, sub).Run()
+	_ = exec.Command(qndbBin, "-m", "mwcToast", t.durationMs, main, sub).Run()
 }
 
 // noopViewProber / noopToaster disable the in-Run toast (sync-now uses these: it

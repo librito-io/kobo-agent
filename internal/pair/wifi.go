@@ -29,7 +29,7 @@ func NewQndbWiFi() WiFi { return &qndbWiFi{} }
 // failure to a No-WiFi dialog is tracked as a followup.)
 func (qndbWiFi) Connect(timeout time.Duration) bool {
 	// Kick the silent connect (best-effort nudge; daemon-side, returns fast).
-	_ = exec.Command("qndb", "-m", "wfmConnectWirelessSilently").Run()
+	_ = exec.Command(qndbBin, "-m", "wfmConnectWirelessSilently").Run()
 
 	// Wait up to the window for wmNetworkConnected so a freshly-connecting device
 	// has settled before we hit /request. We don't fail on timeout: an
@@ -55,5 +55,5 @@ func millis(d time.Duration) string {
 // qndb exits 0 when the signal fires, and exits non-zero ("timeout expired
 // after N milliseconds" on stderr) when the window lapses.
 func signalFires(signal, timeoutMS string) bool {
-	return exec.Command("qndb", "-t", timeoutMS, "-s", signal).Run() == nil
+	return exec.Command(qndbBin, "-t", timeoutMS, "-s", signal).Run() == nil
 }

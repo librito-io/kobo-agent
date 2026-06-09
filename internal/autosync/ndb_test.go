@@ -1,6 +1,19 @@
 package autosync
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
+
+// TestQndbBinIsAbsolute guards the udev-no-PATH regression: the WiFi-up autosync
+// is launched by udev, whose RUN children inherit NO PATH, so a bare command name
+// fails exec.LookPath and the view probe + toast silently no-op (sync still runs).
+// qndb must be invoked by absolute path.
+func TestQndbBinIsAbsolute(t *testing.T) {
+	if !filepath.IsAbs(qndbBin) {
+		t.Fatalf("qndbBin = %q, must be an absolute path (udev RUN children have no PATH)", qndbBin)
+	}
+}
 
 func TestLastLineField(t *testing.T) {
 	cases := []struct {
