@@ -10,7 +10,6 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,32 +31,14 @@ const adsDir = "/mnt/onboard/.adds/librito"
 var version = "dev"
 
 func main() {
-	os.Exit(dispatch(os.Args[1:], commands, runSync, os.Stdout, os.Stderr))
-}
-
-// dispatch routes argv and runs the result, returning a process exit code. The
-// registry, the default-sync runner, and the output streams are parameters so
-// dispatch is fully testable (no os.Exit, no global I/O). route() decides; this
-// only acts.
-func dispatch(args []string, cmds []command, defaultRun func([]string) int, stdout, stderr io.Writer) int {
-	r := route(args, commandNames(cmds))
-	switch r.kind {
-	case routeHelp:
-		fmt.Fprint(stdout, renderHelp(cmds))
-		return 0
-	case routeUnknown:
-		fmt.Fprintf(stderr, "error: unknown command %q\nsee '%s --help' for the list of commands\n", r.name, progName)
-		return 2
-	case routeSubcommand:
-		for _, c := range cmds {
-			if c.name == r.name {
-				return c.run(r.rest)
-			}
-		}
-		return 2 // unreachable: route only returns names drawn from cmds
-	default: // routeDefault
-		return defaultRun(r.rest)
+	// Display the program as it was actually invoked (on-device the binary is
+	// installed as "kobo-sync", not the dev artifact name), so help + error
+	// pointers name a command that exists on the target. progName is the fallback.
+	prog := progName
+	if b := filepath.Base(os.Args[0]); b != "" && b != "." {
+		prog = b
 	}
+	os.Exit(dispatch(os.Args[1:], prog, commands, runSync, os.Stdout, os.Stderr))
 }
 
 func runPair(argv []string) int {

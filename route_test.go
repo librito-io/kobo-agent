@@ -20,6 +20,7 @@ func TestRoute(t *testing.T) {
 		{"known sync-now", []string{"sync-now"}, routeResult{kind: routeSubcommand, name: "sync-now", rest: []string{}}},
 		{"help --help", []string{"--help"}, routeResult{kind: routeHelp}},
 		{"help -h", []string{"-h"}, routeResult{kind: routeHelp}},
+		{"help --h double dash", []string{"--h"}, routeResult{kind: routeHelp}},
 		{"help -help single dash", []string{"-help"}, routeResult{kind: routeHelp}},
 		{"help word", []string{"help"}, routeResult{kind: routeHelp}},
 		{"help ignores trailing", []string{"help", "pair"}, routeResult{kind: routeHelp}},
@@ -27,6 +28,8 @@ func TestRoute(t *testing.T) {
 		{"unknown sync + flag", []string{"sync", "--dry-run"}, routeResult{kind: routeUnknown, name: "sync"}},
 		{"unknown typo + flag", []string{"statas", "--url", "x"}, routeResult{kind: routeUnknown, name: "statas"}},
 		{"unknown empty token", []string{""}, routeResult{kind: routeUnknown, name: ""}},
+		{"bare dash -> unknown", []string{"-"}, routeResult{kind: routeUnknown, name: "-"}},
+		{"bare dash + flag -> unknown", []string{"-", "--dry-run"}, routeResult{kind: routeUnknown, name: "-"}},
 		{"subcommand help not top-level", []string{"watch", "--help"}, routeResult{kind: routeSubcommand, name: "watch", rest: []string{"--help"}}},
 	}
 	for _, tt := range tests {

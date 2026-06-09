@@ -25,8 +25,13 @@ type routeResult struct {
 //  2. a help spelling as first token -> help (BEFORE the flag check, so
 //     "--help"/"-help" show the top-level list, not sync's flags)
 //  3. a known subcommand             -> that subcommand, rest = args[1:]
-//  4. a flag (begins with "-")       -> default sync, rest = args
+//  4. a real flag (starts "-", len>1) -> default sync, rest = args
 //  5. any other non-flag word        -> unknown command
+//
+// A bare "-" is deliberately NOT treated as a flag: Go's flag package stops
+// parsing at a lone "-" (it is not a flag), so routing it to the default sync
+// would silently drop every flag after it — the exact defect this dispatcher
+// exists to prevent. It falls through to rule 5 (unknown) instead.
 func route(args, known []string) routeResult {
 	if len(args) == 0 {
 		return routeResult{kind: routeDefault}
@@ -40,7 +45,7 @@ func route(args, known []string) routeResult {
 			return routeResult{kind: routeSubcommand, name: first, rest: args[1:]}
 		}
 	}
-	if strings.HasPrefix(first, "-") {
+	if len(first) > 1 && strings.HasPrefix(first, "-") {
 		return routeResult{kind: routeDefault, rest: args}
 	}
 	return routeResult{kind: routeUnknown, name: first}

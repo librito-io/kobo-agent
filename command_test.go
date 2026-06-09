@@ -19,7 +19,7 @@ func TestCommandNames(t *testing.T) {
 }
 
 func TestRenderHelpListsAllCommands(t *testing.T) {
-	help := renderHelp(commands)
+	help := renderHelp(progName, commands)
 	for _, c := range commands {
 		if !strings.Contains(help, c.name) {
 			t.Errorf("renderHelp missing command %q\n---\n%s", c.name, help)
