@@ -32,7 +32,13 @@ chmod 755 /usr/local/dropbear/on-boot.sh
 # rejected every pubkey. Non-recursive + idempotent. We record the prior owner so
 # the undo is correct on a device that did NOT ship as 501 (don't hard-code it).
 PRIOR_ROOT_OWNER=$(stat -c '%u:%g' / 2>/dev/null)
-echo "/ owner before: ${PRIOR_ROOT_OWNER:-unknown}  (undo with: chown ${PRIOR_ROOT_OWNER:-501:0} /)"
+if [ -n "$PRIOR_ROOT_OWNER" ]; then
+  echo "/ owner before: $PRIOR_ROOT_OWNER  (undo with: chown $PRIOR_ROOT_OWNER /)"
+else
+  # stat failed: don't print a guessed undo target — a wrong chown here is the one
+  # mistake this script can't self-correct. Make the human verify before reverting.
+  echo "/ owner before: unknown (stat failed) — verify owner manually before any undo"
+fi
 if [ "$PRIOR_ROOT_OWNER" = "0:0" ]; then
   echo "/ already root-owned — chown not needed"
 else
