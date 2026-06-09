@@ -2,21 +2,15 @@
 // and syncs them to the Librito import endpoint (POST /api/import/kobo); the
 // `pair` subcommand obtains a device token via the Librito pairing API.
 //
-// Usage:
-//
-//	librito-kobo-sync              sync (token from --token / LIBRITO_TOKEN / token file)
-//	librito-kobo-sync pair         pair this device (writes hardware-id + token)
-//	librito-kobo-sync autosync     triggered sync (udev WiFi-up); token + url from files
-//	librito-kobo-sync watch        resident daemon: immediate sync on a new highlight while connected
-//	librito-kobo-sync status       print the last-sync status line
-//	librito-kobo-sync about        print pairing info + agent version
-//	librito-kobo-sync sync-now     run a one-shot sync with feedback (for NickelMenu)
+// Run `librito-kobo-sync --help` for the list of subcommands. With no
+// subcommand it performs a sync.
 package main
 
 import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,25 +32,32 @@ const adsDir = "/mnt/onboard/.adds/librito"
 var version = "dev"
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "pair" {
-		os.Exit(runPair(os.Args[2:]))
+	os.Exit(dispatch(os.Args[1:], commands, runSync, os.Stdout, os.Stderr))
+}
+
+// dispatch routes argv and runs the result, returning a process exit code. The
+// registry, the default-sync runner, and the output streams are parameters so
+// dispatch is fully testable (no os.Exit, no global I/O). route() decides; this
+// only acts.
+func dispatch(args []string, cmds []command, defaultRun func([]string) int, stdout, stderr io.Writer) int {
+	r := route(args, commandNames(cmds))
+	switch r.kind {
+	case routeHelp:
+		fmt.Fprint(stdout, renderHelp(cmds))
+		return 0
+	case routeUnknown:
+		fmt.Fprintf(stderr, "error: unknown command %q\nsee '%s --help' for the list of commands\n", r.name, progName)
+		return 2
+	case routeSubcommand:
+		for _, c := range cmds {
+			if c.name == r.name {
+				return c.run(r.rest)
+			}
+		}
+		return 2 // unreachable: route only returns names drawn from cmds
+	default: // routeDefault
+		return defaultRun(r.rest)
 	}
-	if len(os.Args) > 1 && os.Args[1] == "autosync" {
-		os.Exit(runAutosync(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "watch" {
-		os.Exit(runWatch(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "status" {
-		os.Exit(runStatus(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "about" {
-		os.Exit(runAbout(os.Args[2:]))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "sync-now" {
-		os.Exit(runSyncNow(os.Args[2:]))
-	}
-	os.Exit(runSync(os.Args[1:]))
 }
 
 func runPair(argv []string) int {
