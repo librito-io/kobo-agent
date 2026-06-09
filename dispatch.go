@@ -13,10 +13,10 @@ func dispatch(args []string, prog string, cmds []command, defaultRun func([]stri
 	r := route(args, commandNames(cmds))
 	switch r.kind {
 	case routeHelp:
-		fmt.Fprint(stdout, renderHelp(prog, cmds))
+		_, _ = fmt.Fprint(stdout, renderHelp(prog, cmds))
 		return 0
 	case routeUnknown:
-		fmt.Fprintf(stderr, "error: unknown command %q\nsee '%s --help' for the list of commands\n", r.name, prog)
+		_, _ = fmt.Fprintf(stderr, "error: unknown command %q\nsee '%s --help' for the list of commands\n", r.name, prog)
 		return 2
 	case routeSubcommand:
 		for _, c := range cmds {
@@ -26,7 +26,7 @@ func dispatch(args []string, prog string, cmds []command, defaultRun func([]stri
 		}
 		// route only returns names drawn from cmds, so this is unreachable — but
 		// be loud rather than exit 2 silently if that invariant ever breaks.
-		fmt.Fprintf(stderr, "internal error: routed to unknown command %q\n", r.name)
+		_, _ = fmt.Fprintf(stderr, "internal error: routed to unknown command %q\n", r.name)
 		return 2
 	default: // routeDefault
 		return defaultRun(r.rest)
