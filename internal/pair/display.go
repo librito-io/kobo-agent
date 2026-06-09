@@ -12,6 +12,12 @@ import (
 // the starting point — TUNE ON HARDWARE (Task 11), pick the smallest reliable.
 const settleDelay = 150 * time.Millisecond
 
+// qndbBin is the absolute path to NickelDBus's qndb CLI — absolute so it resolves
+// from any launcher (see internal/autosync.qndbBin: udev RUN children inherit no
+// PATH, which silently broke the autosync toast). Pairing runs from a NickelMenu
+// shell today, but the absolute path keeps this qndb edge robust regardless.
+const qndbBin = "/usr/bin/qndb"
+
 // qndbDisplay drives the single live-updating NickelDBus dialog via `qndb`.
 // All methods are best-effort: a failed qndb call logs nothing and returns —
 // the pairing loop must not depend on display succeeding.
@@ -97,7 +103,7 @@ func (d *qndbDisplay) startResultWatcher() {
 
 	go func() {
 		for {
-			out, err := exec.Command("qndb", "-s", "dlgConfirmResult").Output()
+			out, err := exec.Command(qndbBin, "-s", "dlgConfirmResult").Output()
 			d.mu.Lock()
 			if d.closed {
 				d.watching = false
@@ -129,7 +135,7 @@ func parseButton(qndbOutput string) Button {
 }
 
 func (d *qndbDisplay) qndb(method string, args ...string) {
-	_ = exec.Command("qndb", append([]string{"-m", method}, args...)...).Run()
+	_ = exec.Command(qndbBin, append([]string{"-m", method}, args...)...).Run()
 }
 
 func (d *qndbDisplay) settle() { time.Sleep(settleDelay) }
