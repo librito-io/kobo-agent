@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/transform"
+	"github.com/librito-io/kobo-sync/internal/transform"
 )
 
 // ImportResult mirrors the server's KoboImportResult ({imported, books}).

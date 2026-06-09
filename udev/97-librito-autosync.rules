@@ -1,1 +1,1 @@
-SUBSYSTEM=="net", KERNEL=="wlan0", ACTION=="add", RUN+="/bin/sh -c '/mnt/onboard/.adds/librito/agent autosync </dev/null >>/mnt/onboard/.adds/librito/autosync.log 2>&1 &'"
+SUBSYSTEM=="net", KERNEL=="wlan0", ACTION=="add", RUN+="/bin/sh -c '/mnt/onboard/.adds/librito/kobo-sync autosync </dev/null >>/mnt/onboard/.adds/librito/autosync.log 2>&1 &'"

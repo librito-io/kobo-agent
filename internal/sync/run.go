@@ -1,8 +1,8 @@
 package sync
 
 import (
-	"github.com/librito-io/kobo-agent/internal/kobo"
-	"github.com/librito-io/kobo-agent/internal/transform"
+	"github.com/librito-io/kobo-sync/internal/kobo"
+	"github.com/librito-io/kobo-sync/internal/transform"
 )
 
 // Options configures one sync run.

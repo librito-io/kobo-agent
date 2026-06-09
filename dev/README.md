@@ -1,6 +1,6 @@
 # Dev harness — on-device SSH + NickelMenu loop
 
-The on-hardware development loop for `librito-kobo-agent`: root SSH over custom
+The on-hardware development loop for `librito-kobo-sync`: root SSH over custom
 dropbear, a dev NickelMenu for recovery/smoke-tests, and the WiFi-stays-up tweak.
 **None of this ships** — it is contributor tooling for working on a real Kobo. The
 user-facing product (the agent, `../nm/librito`, `../udev/*`) is separate.
@@ -14,7 +14,7 @@ user-facing product (the agent, `../nm/librito`, `../udev/*`) is separate.
 > reproduce this across firmwares would lie.
 
 Device-specific secrets (the device IP/MAC, DHCP reservation) live in the
-local-only build plan (`docs/agent-build-plan.md`, gitignored), **not here**.
+local-only build plan (`docs/sync-build-plan.md`, gitignored), **not here**.
 
 > **Maintainers:** after any substantive edit to this runbook, re-audit it from a
 > _cold context_ — a fresh agent/contributor with **no** device knowledge and **no**
@@ -47,7 +47,7 @@ ones are untested against this firmware.
 
 **The dropbear `KoboRoot.tgz` is NOT in version control and cannot be built from
 this runbook** — the scripts above are inert without it. Reproducing it is the
-one true gap (tracked: kobo-agent#26). Rough recipe: cross-compile dropbear
+one true gap (tracked: kobo-sync#26). Rough recipe: cross-compile dropbear
 (v2025.89, modern, with ML-KEM/sntrup761) from `obynio/kobopatch-ssh`'s toolchain
 (the `obynio/kobo-toolchain:crosstools` image is **arm64-native** — do NOT force
 `--platform linux/amd64` on Apple Silicon), then package a `KoboRoot.tgz` that
@@ -210,10 +210,10 @@ ssh -M -S "$CM" -o ServerAliveInterval=10 -fN root@$IP   # one auth, reused
 S(){ ssh -S "$CM" root@$IP "$@"; }
 
 # no sftp-server → push files via cat-pipe
-S 'cat > /mnt/onboard/.adds/librito/agent' < dist/librito-kobo-agent-armv7
-S 'chmod +x /mnt/onboard/.adds/librito/agent'
+S 'cat > /mnt/onboard/.adds/librito/kobo-sync' < dist/librito-kobo-sync-armv7
+S 'chmod +x /mnt/onboard/.adds/librito/kobo-sync'
 
-S '/mnt/onboard/.adds/librito/agent sync --dry-run'      # run it
+S '/mnt/onboard/.adds/librito/kobo-sync --dry-run'      # run it
 ```
 
 ## Persistence scope

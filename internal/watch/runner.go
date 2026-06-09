@@ -3,7 +3,7 @@ package watch
 import (
 	"fmt"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
 // autosyncRunner delegates the whole sync to autosync.Run (lock → token-guard →

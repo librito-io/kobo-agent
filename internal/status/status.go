@@ -1,5 +1,5 @@
 // Package status holds the PURE display decisions for the on-device surface
-// (agent status / about / sync-now). All functions are total + table-tested; the
+// (kobo-sync status / about / sync-now). All functions are total + table-tested; the
 // device edges (file read, qndb) live in autosync/main. Imports autosync for its
 // Record + Outcome types (one-way; autosync never imports status).
 package status
@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
-// DecideStatusLine renders the single `agent status` line. Precedence is PINNED
+// DecideStatusLine renders the single `kobo-sync status` line. Precedence is PINNED
 // (first match wins) — see the spec table. A prior success is the durable truth:
 // once it has ever synced, show WHEN and let a stale value be the self-revealing
 // alarm (no alarmist "failed" line after a real success).
@@ -70,7 +70,7 @@ func DecideSyncResult(o autosync.Outcome) string {
 	}
 }
 
-// AboutLines builds the `agent about` output. Pure so the token gating, the
+// AboutLines builds the `kobo-sync about` output. Pure so the token gating, the
 // RFC3339 parse→"Jan 2, 2006" format, and the line-omission rules are
 // table-tested — the main.go glue is then just file reads + printing. An empty
 // or unparseable pairedAt drops the "Paired" line rather than showing a bogus
@@ -86,5 +86,5 @@ func AboutLines(hasToken bool, email, pairedAt, version string) []string {
 	if t, err := time.Parse(time.RFC3339, pairedAt); err == nil {
 		lines = append(lines, "Paired "+t.Format("Jan 2, 2006"))
 	}
-	return append(lines, "Librito agent "+version)
+	return append(lines, "Librito Sync "+version)
 }

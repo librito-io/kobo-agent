@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
 // SigReader reads the current highlight signature (impl wraps

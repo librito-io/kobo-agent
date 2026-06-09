@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
 // Minimal fakes for the autosync edges the two non-network exit paths touch.

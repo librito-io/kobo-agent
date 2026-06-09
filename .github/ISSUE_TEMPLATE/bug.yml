@@ -1,5 +1,5 @@
-name: Agent bug
-description: Defect in the kobo-agent sync, transform, pairing, or on-device UI
+name: kobo-sync bug
+description: Defect in kobo-sync — sync, transform, pairing, or on-device UI
 type: "Bug"
 labels: ["needs-triage"]
 projects: ["librito-io/1"]
@@ -22,7 +22,7 @@ body:
       placeholder: |
         1. Pair the device
         2. Add a highlight in a book
-        3. Run `agent sync`
+        3. Run a sync
         4. ...
     validations:
       required: true

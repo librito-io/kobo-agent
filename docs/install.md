@@ -32,7 +32,7 @@ Cross-compile for the Kobo (32-bit ARMv7, static):
 
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
-  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-agent-armv7 .
+  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-sync-armv7 .
 ```
 
-On-device path: `/mnt/onboard/.adds/librito/agent`.
+On-device path: `/mnt/onboard/.adds/librito/kobo-sync`.

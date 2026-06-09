@@ -1,11 +1,11 @@
-# CLAUDE.md — librito-kobo-agent
+# CLAUDE.md — librito-kobo-sync
 
 On-device Go agent that reads stock-Nickel highlights from a Kobo e-reader and
 syncs them to the Librito web backend. **Work in progress** — Steps 1–3.5 (sync
 core, pairing, udev WiFi-up autosync, resident watch daemon) are done and
 hardware-verified; Steps 4–5 are not built yet (see _Roadmap_).
 
-> **This is a public repo** (`librito-io/kobo-agent`, GPLv3). Keep personal
+> **This is a public repo** (`librito-io/kobo-sync`, GPLv3). Keep personal
 > data out of fixtures and commits (see _Fixtures_). Do not push to a remote
 > without the user's explicit go-ahead — pause between commit and any remote
 > action.
@@ -24,9 +24,9 @@ repo's API contract**. A session working only in this repo must know:
 - **`librito-io/reader`** — the PaperS3 ESP32 firmware (C++/PlatformIO). Shares
   **no code** with this agent. Holds a reference epub-OPF ISBN parser
   (`src/content/epub/EpubReader.cpp::parseIsbnFromOpf`) worth porting (see #503).
-- **`librito-io/kobo-agent`** (this repo) — the Kobo companion. A _client_ of
+- **`librito-io/kobo-sync`** (this repo) — the Kobo companion. A _client_ of
   the web API, the same way the PaperS3 firmware and a browser are. The Kobo
-  build plan + device facts live **here** in `docs/agent-build-plan.md`
+  build plan + device facts live **here** in `docs/sync-build-plan.md`
   (local-only, gitignored — keeps device/dev specifics out of the public repo).
 
 The Kobo is char-offset / chapter-path based, not word-index based. It is a
@@ -107,7 +107,7 @@ Each looks wrong to someone who doesn't know the context. They are correct.
    boot-persists, so lost dev SSH is no longer the reason). Note two WiFi
    states: a _disabled_ radio can't be silently recovered, but the real-world
    state the agent faces is _enabled-but-disconnected_ (Nickel's battery-timer
-   drop), which the silent path drives. Full probe results: `docs/agent-build-plan.md`
+   drop), which the silent path drives. Full probe results: `docs/sync-build-plan.md`
    ("Step-2 probe").
 
 ## Build & test
@@ -116,9 +116,9 @@ Requires Go 1.24+.
 
 ```sh
 # static cross-compile for the Kobo (armv7l hard-float) — no C toolchain
-# -X main.version stamps the version surfaced by `agent about` (single origin).
+# -X main.version stamps the version surfaced by `kobo-sync about` (single origin).
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
-  go build -trimpath -ldflags="-s -w -X main.version=0.9.0" -o dist/librito-kobo-agent-armv7 .
+  go build -trimpath -ldflags="-s -w -X main.version=0.9.0" -o dist/librito-kobo-sync-armv7 .
 
 go test ./...
 ```
@@ -143,7 +143,7 @@ The runnable dev harness is version-controlled: **`dev/README.md`** is the
 committed runbook (SSH/dropbear boot stack, dev NickelMenu, `chown 0:0 /` fix,
 `ForceWifiOn`) with the reference config files in `dev/`. **Device-specific
 secrets** (IP/MAC/DHCP reservation) + the verified on-hardware findings stay in
-`docs/agent-build-plan.md` (Step 0; local-only, gitignored). Essentials:
+`docs/sync-build-plan.md` (Step 0; local-only, gitignored). Essentials:
 
 - **SSH:** custom dropbear. Dev **key auth (pubkey)** works and survives reboot
   (see _Boot-persistent SSH_ below). Persistent master:
@@ -166,7 +166,7 @@ secrets** (IP/MAC/DHCP reservation) + the verified on-hardware findings stay in
   key was rejected and the tap WAS required (the tap blanks root's password +
   restarts `dropbear -B`). Device IP has been stable across reboots (DHCP lease,
   same MAC). Full mechanism + IP/MAC: build plan (local-only).
-- **On-device path:** `/mnt/onboard/.adds/librito/agent`.
+- **On-device path:** `/mnt/onboard/.adds/librito/kobo-sync`.
 - **Local round-trip:** the device hits the Mac's dev server over LAN, so run
   `npm run dev -- --host` (not localhost-only) and point `--url` at the Mac's
   LAN IP. Mint a local device token by inserting a `devices` row against local
@@ -214,7 +214,7 @@ PR body.
   `bug(scope):` `chore(scope):` `docs(scope):` `test(scope):` `perf(scope):`
   `refactor(scope):`. `bug` = user-facing defect fix, distinct from `fix`
   (internal regression). Scope is optional and free-form; a package name
-  (`sync`, `transform`, `pair`, `kobo`) or `agent` are common.
+  (`sync`, `transform`, `pair`, `kobo`) or `cli` are common.
 - **Enforcement is CI-only** — this is a Go repo with no Node runtime, so there
   is no local husky hook (unlike `librito-io/web`).
   `.github/workflows/commitlint.yml` lints every commit in a PR;
@@ -230,7 +230,7 @@ PR body.
 
 All work is tracked in GitHub Issues on the shared org Project board
 ("Librito", `https://github.com/orgs/librito-io/projects/1`) spanning `web`,
-`reader`, and `kobo-agent`. Issues opened from the templates auto-add to it.
+`reader`, and `kobo-sync`. Issues opened from the templates auto-add to it.
 
 - **File immediately** for incidental finds during a primary task — do not stash
   them in markdown trackers, and do not create follow-up `.md` docs.
@@ -239,8 +239,8 @@ All work is tracked in GitHub Issues on the shared org Project board
   area via an `area:*` label.
 - **CLI flow** (older `gh` has no `--type` flag):
   ```bash
-  ISSUE_URL=$(gh issue create --repo librito-io/kobo-agent --title "..." --label "area:sync" --body "...")
-  gh api repos/librito-io/kobo-agent/issues/${ISSUE_URL##*/} -F type=Chore --silent
+  ISSUE_URL=$(gh issue create --repo librito-io/kobo-sync --title "..." --label "area:sync" --body "...")
+  gh api repos/librito-io/kobo-sync/issues/${ISSUE_URL##*/} -F type=Chore --silent
   ```
 - **Body:** four `##` sections in order — `## Problem`, `## Solution` (mark
   `_unknown_` for bugs without a known fix), `## Discovery` (link the PR),

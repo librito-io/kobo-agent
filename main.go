@@ -1,16 +1,16 @@
-// Command librito-kobo-agent reads highlights from a Kobo's KoboReader.sqlite
+// Command librito-kobo-sync reads highlights from a Kobo's KoboReader.sqlite
 // and syncs them to the Librito import endpoint (POST /api/import/kobo); the
 // `pair` subcommand obtains a device token via the Librito pairing API.
 //
 // Usage:
 //
-//	librito-kobo-agent              sync (token from --token / LIBRITO_TOKEN / token file)
-//	librito-kobo-agent pair         pair this device (writes hardware-id + token)
-//	librito-kobo-agent autosync     triggered sync (udev WiFi-up); token + url from files
-//	librito-kobo-agent watch        resident daemon: immediate sync on a new highlight while connected
-//	librito-kobo-agent status       print the last-sync status line
-//	librito-kobo-agent about        print pairing info + agent version
-//	librito-kobo-agent sync-now     run a one-shot sync with feedback (for NickelMenu)
+//	librito-kobo-sync              sync (token from --token / LIBRITO_TOKEN / token file)
+//	librito-kobo-sync pair         pair this device (writes hardware-id + token)
+//	librito-kobo-sync autosync     triggered sync (udev WiFi-up); token + url from files
+//	librito-kobo-sync watch        resident daemon: immediate sync on a new highlight while connected
+//	librito-kobo-sync status       print the last-sync status line
+//	librito-kobo-sync about        print pairing info + agent version
+//	librito-kobo-sync sync-now     run a one-shot sync with feedback (for NickelMenu)
 package main
 
 import (
@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
-	"github.com/librito-io/kobo-agent/internal/pair"
-	"github.com/librito-io/kobo-agent/internal/status"
-	"github.com/librito-io/kobo-agent/internal/sync"
-	"github.com/librito-io/kobo-agent/internal/watch"
+	"github.com/librito-io/kobo-sync/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/pair"
+	"github.com/librito-io/kobo-sync/internal/status"
+	"github.com/librito-io/kobo-sync/internal/sync"
+	"github.com/librito-io/kobo-sync/internal/watch"
 )
 
 // adsDir is where pairing persists hardware-id + token (co-located with the
@@ -34,7 +34,7 @@ import (
 const adsDir = "/mnt/onboard/.adds/librito"
 
 // version is the agent version, set at build time via -ldflags -X main.version.
-// The single source of truth surfaced by `agent about`.
+// The single source of truth surfaced by `kobo-sync about`.
 var version = "dev"
 
 func main() {
