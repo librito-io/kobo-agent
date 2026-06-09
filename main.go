@@ -48,6 +48,9 @@ func runPair(argv []string) int {
 	model := fs.String("model", "", "override the device model sent on pairing (default: detect from the Kobo version file)")
 	versionPath := fs.String("version-file", pair.DefaultVersionPath, "path to the Kobo version file used to detect the model")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 
 	// Model precedence: --model override > detected from the version file >
 	// legible fallback (DetectModel never errors; it degrades to "Kobo").
@@ -98,6 +101,9 @@ func runSync(argv []string) int {
 	dir := fs.String("dir", adsDir, "directory holding the paired token file")
 	dryRun := fs.Bool("dry-run", false, "read + map + report, do not POST")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 
 	tok := resolveToken(*token, os.Getenv("LIBRITO_TOKEN"), filepath.Join(*dir, "token"))
 	if tok == "" && !*dryRun {
@@ -137,6 +143,9 @@ func runAutosync(argv []string) int {
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path")
 	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 	if *recordPath == "" {
 		*recordPath = filepath.Join(*dir, "last-sync")
 	}
@@ -168,6 +177,9 @@ func runWatch(argv []string) int {
 	walName := fs.String("wal-name", "", "WAL filename to react to (default: <db basename>-wal; escape hatch if the spike shows a different name)")
 	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 
 	wal := *walName
 	if wal == "" {
@@ -231,6 +243,9 @@ func runStatus(argv []string) int {
 	dir := fs.String("dir", adsDir, "directory holding the token + last-sync files")
 	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 	if *recordPath == "" {
 		*recordPath = filepath.Join(*dir, "last-sync")
 	}
@@ -245,6 +260,9 @@ func runAbout(argv []string) int {
 	fs := flag.NewFlagSet("about", flag.ExitOnError)
 	dir := fs.String("dir", adsDir, "directory holding the account files")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 
 	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
 	lines := status.AboutLines(hasToken,
@@ -266,6 +284,9 @@ func runSyncNow(argv []string) int {
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "result log path")
 	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync)")
 	_ = fs.Parse(argv)
+	if rejectPositionals(fs) {
+		return 2
+	}
 	if *recordPath == "" {
 		*recordPath = filepath.Join(*dir, "last-sync")
 	}
