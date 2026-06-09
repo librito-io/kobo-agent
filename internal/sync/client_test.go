@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/librito-io/kobo-agent/internal/transform"
+	"github.com/librito-io/kobo-sync/internal/transform"
 )
 
 func sampleItems() []transform.KoboImportItem {

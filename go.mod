@@ -1,4 +1,4 @@
-module github.com/librito-io/kobo-agent
+module github.com/librito-io/kobo-sync
 
 go 1.26.4
 

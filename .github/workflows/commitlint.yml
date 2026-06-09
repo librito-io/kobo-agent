@@ -32,4 +32,4 @@ jobs:
           # `export default` which is ESM regardless).
           configFile: commitlint.config.mjs
           failOnWarnings: false
-          helpURL: https://github.com/librito-io/kobo-agent/blob/main/CLAUDE.md#pr--commit-convention
+          helpURL: https://github.com/librito-io/kobo-sync/blob/main/CLAUDE.md#pr--commit-convention

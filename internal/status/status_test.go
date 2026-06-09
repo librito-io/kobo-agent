@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
 func TestAboutLines(t *testing.T) {
@@ -18,10 +18,10 @@ func TestAboutLines(t *testing.T) {
 		want     []string
 	}{
 		{"not paired wins", false, "me@x.co", "2026-06-08T12:00:00Z", "0.9.0", []string{"Not paired"}},
-		{"full", true, "me@x.co", "2026-06-08T12:00:00Z", "0.9.0", []string{"me@x.co", "Paired Jun 8, 2026", "Librito agent 0.9.0"}},
-		{"missing email omitted", true, "", "2026-06-08T12:00:00Z", "0.9.0", []string{"Paired Jun 8, 2026", "Librito agent 0.9.0"}},
-		{"unparseable paired-at dropped", true, "me@x.co", "not-a-date", "0.9.0", []string{"me@x.co", "Librito agent 0.9.0"}},
-		{"empty paired-at dropped", true, "me@x.co", "", "dev", []string{"me@x.co", "Librito agent dev"}},
+		{"full", true, "me@x.co", "2026-06-08T12:00:00Z", "0.9.0", []string{"me@x.co", "Paired Jun 8, 2026", "Librito Sync 0.9.0"}},
+		{"missing email omitted", true, "", "2026-06-08T12:00:00Z", "0.9.0", []string{"Paired Jun 8, 2026", "Librito Sync 0.9.0"}},
+		{"unparseable paired-at dropped", true, "me@x.co", "not-a-date", "0.9.0", []string{"me@x.co", "Librito Sync 0.9.0"}},
+		{"empty paired-at dropped", true, "me@x.co", "", "dev", []string{"me@x.co", "Librito Sync dev"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

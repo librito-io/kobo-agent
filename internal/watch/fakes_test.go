@@ -3,7 +3,7 @@ package watch
 import (
 	"time"
 
-	"github.com/librito-io/kobo-agent/internal/autosync"
+	"github.com/librito-io/kobo-sync/internal/autosync"
 )
 
 // fakeClock: fixed monotonic time (debounce uses Now; Window==0 in tests means

@@ -93,7 +93,7 @@ type Store interface {
 	// autosync (Step 3) targets the same backend the token was minted on.
 	WriteURL(url string) error
 	// WriteAccount persists the paired account email + the paired-at calendar
-	// timestamp (for `agent about`). pairedAt uses WALL time (a successful pair
+	// timestamp (for `kobo-sync about`). pairedAt uses WALL time (a successful pair
 	// just did networked TLS, so the clock is NTP-set) — NOT the monotonic Clock.
 	WriteAccount(email string, pairedAt time.Time) error
 }

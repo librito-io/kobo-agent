@@ -8,9 +8,9 @@ import (
 )
 
 // record.go implements the last-sync record: a small JSON file read-modify-written
-// by RecordStore after each sync attempt, read back only by `agent status`.
+// by RecordStore after each sync attempt, read back only by `kobo-sync status`.
 
-// Record is the persisted last-sync state. Its ONLY reader is `agent status`
+// Record is the persisted last-sync state. Its ONLY reader is `kobo-sync status`
 // (via internal/status.DecideStatusLine); sync-now uses Run's return value, not
 // this file. Timestamps are wall-clock (calendar) time — see the spec's
 // "Time on the Kobo" section; trustworthy here because the write happens right
@@ -62,7 +62,7 @@ func (s *fileRecordStore) Record(o Outcome) {
 	}
 	_ = os.MkdirAll(filepath.Dir(s.path), 0o755)
 	// Write to a temp file then rename: rename is atomic on the same filesystem,
-	// so `agent status` (which reads WITHOUT the shared sync lock) can never observe
+	// so `kobo-sync status` (which reads WITHOUT the shared sync lock) can never observe
 	// a torn/half-written record. Writer-vs-writer is already serialized by the lock.
 	tmp := s.path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {

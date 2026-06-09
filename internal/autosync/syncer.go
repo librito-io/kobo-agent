@@ -1,6 +1,6 @@
 package autosync
 
-import "github.com/librito-io/kobo-agent/internal/sync"
+import "github.com/librito-io/kobo-sync/internal/sync"
 
 // Syncer runs the highlight sync. The sync.Run adapter is below; the
 // orchestrator tests use a scripted fake.

@@ -1,4 +1,4 @@
-# librito-kobo-agent
+# librito-kobo-sync
 
 On-device agent that reads stock-Nickel highlights from a Kobo e-reader and
 syncs them to the Librito web backend (`POST /api/import/kobo`).
@@ -33,11 +33,11 @@ Requires Go (1.24+).
 
 ```sh
 # host build (for local testing)
-go build -o librito-kobo-agent .
+go build -o librito-kobo-sync .
 
 # static cross-compile for the Kobo (armv7l, hard-float)
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
-  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-agent-armv7 .
+  go build -trimpath -ldflags="-s -w" -o dist/librito-kobo-sync-armv7 .
 ```
 
 The binary is statically linked (pure-Go SQLite via `modernc.org/sqlite`, Go's
@@ -46,13 +46,13 @@ own TLS stack) — no C toolchain, no runtime dependencies on the device.
 ## Usage
 
 ```sh
-librito-kobo-agent \
+librito-kobo-sync \
   --db   /mnt/onboard/.kobo/KoboReader.sqlite \
   --url  https://librito.io \
   --token sk_device_xxxxx
 
 # inspect what would be sent, without a token or a POST:
-librito-kobo-agent --db ./KoboReader.sqlite --dry-run
+librito-kobo-sync --db ./KoboReader.sqlite --dry-run
 ```
 
 The token may also be supplied via `LIBRITO_TOKEN`. Defaults: `--db` is the
@@ -64,8 +64,8 @@ No `sftp-server` on stock Kobo; copy over an SSH master with a cat-pipe:
 
 ```sh
 ssh -S "$CM" root@<kobo-ip> \
-  'mkdir -p /mnt/onboard/.adds/librito && cat > /mnt/onboard/.adds/librito/agent && chmod +x /mnt/onboard/.adds/librito/agent' \
-  < dist/librito-kobo-agent-armv7
+  'mkdir -p /mnt/onboard/.adds/librito && cat > /mnt/onboard/.adds/librito/kobo-sync && chmod +x /mnt/onboard/.adds/librito/kobo-sync' \
+  < dist/librito-kobo-sync-armv7
 ```
 
 ## Tests
@@ -85,13 +85,13 @@ un-checkpointed WAL.
 
 | Step | Status | What                                           |
 | ---- | ------ | ---------------------------------------------- |
-| 1    | ✅     | Agent core (read SQLite → POST) — this repo    |
+| 1    | ✅     | Sync core (read SQLite → POST) — this repo     |
 | 2    | —      | On-device pairing (NickelMenu → token to disk) |
 | 3    | —      | udev WiFi-up auto-sync trigger                 |
 | 4    | —      | FBInk status dashboard                         |
 | 5    | —      | Mac installer app                              |
 
-Build plan + device facts: [`docs/agent-build-plan.md`](docs/agent-build-plan.md).
+Build plan + device facts: [`docs/sync-build-plan.md`](docs/sync-build-plan.md).
 Install prerequisites (NickelDBus, NickelMenu): [`docs/install.md`](docs/install.md).
 Import endpoint + wire contract: `librito-io/web` `src/lib/server/import/kobo.ts`.
 

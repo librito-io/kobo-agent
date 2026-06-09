@@ -4,7 +4,7 @@ go.work.sum
 
 # Compiled agent binaries (cross-compiled per-arch, not source).
 /dist/
-librito-kobo-agent
+librito-kobo-sync
 *.test
 
 # branch-review tooling artifacts
@@ -13,4 +13,4 @@ librito-kobo-agent
 # Design specs and implementation plans (local only)
 docs/superpowers/
 # Build plan — local-only working doc (device facts + step tracker), like the specs/plans above
-docs/agent-build-plan.md
+docs/sync-build-plan.md

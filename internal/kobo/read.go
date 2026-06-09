@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/librito-io/kobo-agent/internal/transform"
+	"github.com/librito-io/kobo-sync/internal/transform"
 
 	_ "modernc.org/sqlite"
 )

@@ -18,7 +18,7 @@
 
 experimental :menu_main_15505_label :Librito
 
-menu_item :main :Sync now :cmd_output :30000 :/mnt/onboard/.adds/librito/agent sync-now
-menu_item :main :Status :cmd_output :2000 :/mnt/onboard/.adds/librito/agent status
-menu_item :main :About :cmd_output :2000 :/mnt/onboard/.adds/librito/agent about
-menu_item :main :Pair Librito :cmd_spawn :quiet :/mnt/onboard/.adds/librito/agent pair
+menu_item :main :Sync now :cmd_output :30000 :/mnt/onboard/.adds/librito/kobo-sync sync-now
+menu_item :main :Status :cmd_output :2000 :/mnt/onboard/.adds/librito/kobo-sync status
+menu_item :main :About :cmd_output :2000 :/mnt/onboard/.adds/librito/kobo-sync about
+menu_item :main :Pair Librito :cmd_spawn :quiet :/mnt/onboard/.adds/librito/kobo-sync pair

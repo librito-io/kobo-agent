@@ -1,6 +1,6 @@
 package watch
 
-import "github.com/librito-io/kobo-agent/internal/kobo"
+import "github.com/librito-io/kobo-sync/internal/kobo"
 
 // fileSigReader reads the signature from a KoboReader.sqlite via the lightweight
 // kobo.ReadHighlightSignature (NOT the heavyweight ReadHighlights).
