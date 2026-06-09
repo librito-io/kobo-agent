@@ -56,7 +56,9 @@ librito-kobo-sync --db ./KoboReader.sqlite --dry-run
 ```
 
 The token may also be supplied via `LIBRITO_TOKEN`. Defaults: `--db` is the
-standard Kobo path, `--url` is `https://librito.io`.
+standard Kobo path, `--url` is `https://librito.io`, and `--dir`
+(`/mnt/onboard/.adds/librito`) is the directory holding the paired token file.
+Run `librito-kobo-sync --help` for the full command list.
 
 ## On-device install (dev)
 

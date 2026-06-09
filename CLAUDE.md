@@ -36,7 +36,11 @@ rows leave the word-index columns NULL and render as plain quoted text.
 ## Architecture
 
 ```
-main.go                 subcommand dispatch: sync (default) | pair | autosync | watch
+main.go                 entrypoint + runXxx subcommand handlers; resolves prog name → dispatch()
+route.go                route()      pure argv → decision: default | help | <subcommand> | unknown
+command.go              commands     subcommand registry (single source) + renderHelp
+dispatch.go             dispatch()   acts on the route decision; unknown command → error + exit 2
+                        subcommands: sync (default) | pair | autosync | watch | status | about | sync-now
 internal/sync/
   run.go      Run()         read → map → (post | dry-run); the orchestrator
   client.go   PostImport()  POST {url}/api/import/kobo, bearer token, full set
