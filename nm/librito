@@ -9,6 +9,18 @@
 # re-verify after any NickelMenu or firmware update. The menu item id (15505)
 # is from the spec's verified example — confirm the live id on-device (Task 11).
 #
+# The appearance options below (caret/decoration/offset/width/
+# flush_separators/separator_inset) make the popover render like a native
+# Nickel popover: pointer caret aimed at the tab, inset from the screen edge
+# and bottom bar, fixed width, full-width row dividers. They require the
+# patched NickelMenu build (librito feat/menu-main-caret branch; upstream PR
+# pgaskin/NickelMenu#233) — on stock NickelMenu v0.6.0 they are silently ignored and the menu
+# renders as the stock flat box. Values are tuned for the Libra Colour
+# (1264x1680) on FW 4.45.23697. The patched build also supports
+# menu_main_15505_italic :0 (upright labels), unused here: Kobo's design
+# language is italic for tap actions, upright for static labels, and these
+# items are all tap actions.
+#
 # The `cmd_output` items run the agent and show its stdout in a native Nickel
 # dialog (hardware-proven). The timeout is in ms. "Sync now" performs a network
 # sync, so its timeout (30000) must comfortably exceed a worst-case sync — this
@@ -17,6 +29,13 @@
 # read-only "Status"/"About" return instantly, so 2000 ms is ample.
 
 experimental :menu_main_15505_label :Librito
+experimental :menu_main_15505_caret :1
+experimental :menu_main_15505_decoration :3
+experimental :menu_main_15505_offset_x :-30
+experimental :menu_main_15505_offset_y :-16
+experimental :menu_main_15505_width :460
+experimental :menu_main_15505_flush_separators :1
+experimental :menu_main_15505_separator_inset :12
 
 menu_item :main :Sync now :cmd_output :30000 :/mnt/onboard/.adds/librito/kobo-sync sync-now
 menu_item :main :Status :cmd_output :2000 :/mnt/onboard/.adds/librito/kobo-sync status
