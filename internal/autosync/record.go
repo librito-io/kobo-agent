@@ -19,12 +19,16 @@ type Record struct {
 	LastSuccessAt *time.Time `json:"last_success_at,omitempty"` // last OK sync; nil = never
 	LastAttemptAt *time.Time `json:"last_attempt_at,omitempty"` // last attempt of any kind
 	LastOutcome   string     `json:"last_outcome,omitempty"`    // "ok" | "offline" | "error"
+	LastCount     int        `json:"last_count,omitempty"`      // highlight count at last OK sync (INTERNAL — the wake-toast growth gate; never displayed)
 }
 
-// RecordStore writes the last-sync record. The file impl is below; Run holds the
-// interface so tests use a fake. Dedup/Unpaired/LockErr never call it.
+// RecordStore writes the last-sync record and reads back the last highlight count.
+// The file impl is below; Run holds the interface so tests use a fake.
+// Dedup/Unpaired/LockErr never call Record. count is persisted only on success;
+// non-success outcomes preserve the prior count (it's still the last KNOWN total).
 type RecordStore interface {
-	Record(o Outcome)
+	Record(o Outcome, count int)
+	LastCount() int
 }
 
 type fileRecordStore struct {
@@ -37,9 +41,18 @@ func NewFileRecordStore(path string, now func() time.Time) RecordStore {
 	return &fileRecordStore{path: path, now: now}
 }
 
+// LastCount returns the highlight count recorded at the last successful sync (0
+// when the record is absent/unparseable). It's read BEFORE Record overwrites it,
+// to gate the wake toast on growth.
+func (s *fileRecordStore) LastCount() int {
+	rec, _ := LoadRecord(s.path)
+	return rec.LastCount
+}
+
 // Record read-modify-writes the file so a non-success attempt preserves the prior
-// last_success_at (the durable "it worked once" truth the status line leans on).
-func (s *fileRecordStore) Record(o Outcome) {
+// last_success_at (the durable "it worked once" truth the status line leans on)
+// and last_count (the growth-gate baseline; only a success moves it).
+func (s *fileRecordStore) Record(o Outcome, count int) {
 	rec, _ := LoadRecord(s.path) // missing → zero Record
 	t := s.now().UTC()
 	rec.LastAttemptAt = &t
@@ -47,6 +60,7 @@ func (s *fileRecordStore) Record(o Outcome) {
 	case OutcomeSynced:
 		rec.LastSuccessAt = &t
 		rec.LastOutcome = "ok"
+		rec.LastCount = count // persist only on success; non-success keeps the loaded prior count
 	case OutcomeOffline:
 		rec.LastOutcome = "offline"
 	case OutcomeError:

@@ -14,6 +14,28 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
+func TestGrew(t *testing.T) {
+	cases := []struct {
+		name        string
+		count, last int
+		want        bool
+	}{
+		{"first sync from zero", 1, 0, true},
+		{"nothing ever, nothing now", 0, 0, false},
+		{"offline backlog flushed", 13, 10, true},
+		{"resend of unchanged set", 13, 13, false},
+		{"single new highlight", 6, 5, true},
+		{"device-side delete shrinks set", 5, 10, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := Grew(c.count, c.last); got != c.want {
+				t.Errorf("Grew(%d, %d) = %v, want %v", c.count, c.last, got, c.want)
+			}
+		})
+	}
+}
+
 func TestShouldToast_Allowlist(t *testing.T) {
 	allow := []string{"home"}
 	if !ShouldToast("home", allow) {

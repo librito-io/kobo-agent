@@ -51,20 +51,25 @@ func Run(d Deps) Outcome {
 
 	if !WaitForConnectivity(d.Prober, d.Clock, d.Timeout, d.Cadence) {
 		d.log(fmt.Sprintf("no connectivity within %s", d.Timeout))
-		d.record(OutcomeOffline)
+		d.record(OutcomeOffline, 0)
 		return OutcomeOffline
 	}
 
 	imported, books, err := d.Syncer.Sync(d.Config.BaseURL(), token)
 	if err != nil {
 		d.log(err.Error())
-		d.record(OutcomeError)
+		d.record(OutcomeError, 0)
 		return OutcomeError
 	}
 
+	// Growth gate: compare this run's full-set total against the last recorded count
+	// BEFORE record() overwrites it. The agent re-sends the full set every run
+	// (invariant #5), so only a real grow (offline-backlog flush, or a capture this
+	// run imported) should toast — a plain re-send must not.
+	grew := Grew(imported, d.lastCount())
 	d.log(fmt.Sprintf("imported %d across %d books", imported, books))
-	d.record(OutcomeSynced)
-	d.maybeToast()
+	d.record(OutcomeSynced, imported)
+	d.maybeToast(grew)
 	return OutcomeSynced
 }
 
@@ -72,16 +77,30 @@ func (d Deps) log(msg string) {
 	d.Logger.Log(FormatLine(d.Clock.Now(), "autosync", msg))
 }
 
-func (d Deps) record(o Outcome) {
+func (d Deps) record(o Outcome, count int) {
 	if d.Record != nil {
-		d.Record.Record(o)
+		d.Record.Record(o, count)
 	}
 }
 
-// maybeToast fires the best-effort post-sync toast iff a Toaster + ViewProber are
-// wired and the current view is allow-listed (never over a book). sync-now leaves
-// these nil → no in-Run toast (it owns its own feedback).
-func (d Deps) maybeToast() {
+// lastCount returns the highlight count at the previous successful sync (0 when no
+// Record is wired or none was ever written) — the growth-gate baseline.
+func (d Deps) lastCount() int {
+	if d.Record == nil {
+		return 0
+	}
+	return d.Record.LastCount()
+}
+
+// maybeToast fires the best-effort post-sync toast iff the highlight set grew, a
+// Toaster + ViewProber are wired, and the current view is allow-listed (never over
+// a book). The grew check is first and cheap: a no-growth run never probes the view
+// (a qndb exec), so the watch path's per-capture cost stays a plain count compare.
+// sync-now leaves Toaster/ViewProber nil → no in-Run toast (it owns its feedback).
+func (d Deps) maybeToast(grew bool) {
+	if !grew {
+		return
+	}
 	if d.Toaster == nil || d.ViewProber == nil {
 		return
 	}

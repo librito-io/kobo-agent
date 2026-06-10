@@ -37,6 +37,14 @@ func (o Outcome) ExitCode() int {
 // plant one over a page.
 var defaultToastAllow = []string{"HomePageView"}
 
+// Grew reports whether the highlight set grew since the last recorded sync, the
+// gate for the post-sync wake toast. The agent re-POSTs the FULL set every run
+// (invariant #5), so a plain re-send is NOT growth — count, not content, is the
+// signal. count is this run's imported total (the server's full-batch size);
+// last is the previously recorded count (0 when never synced). A device-side
+// delete shrinks the set (count < last) → not growth → no toast.
+func Grew(count, last int) bool { return count > last }
+
 // ShouldToast reports whether a post-sync toast may fire on the given view.
 func ShouldToast(view string, allow []string) bool {
 	for _, v := range allow {

@@ -209,19 +209,26 @@ func runWatch(argv []string) int {
 	// Resident daemon. The sync delegates to autosync.Run with the SAME shared
 	// lock as the udev path (so they never double-run) but a SHORT timeout (we
 	// only sync when already connected). Single-instance via a SEPARATE watch lock.
-	// Record is wired (watch tracks last-sync) but ViewProber/Toaster are nil —
-	// suppressing the toast for the highlight-while-reading path is correct and
-	// avoids a qndb call per highlight.
+	// ViewProber/Toaster ARE wired (like the udev path): whichever run wins the
+	// shared lock performs the real import, so it must own the toast — otherwise a
+	// highlight captured while connected, imported by the watch winner, leaves the
+	// udev loser to dedup and toast nothing. The growth gate keeps this quiet: the
+	// toast fires only when the set grew AND the view is allow-listed, so an in-book
+	// capture (ReadingView) never toasts; the only added cost is one qndb view-probe
+	// per real growth (skipped entirely when nothing grew). qndb is absolute, so the
+	// probe works regardless of how the daemon was launched.
 	runner := watch.NewRunner(autosync.Deps{
-		Locker:  autosync.NewFlockLocker(*syncLock),
-		Config:  autosync.NewFileConfig(*dir, *defaultURL),
-		Prober:  prober,
-		Syncer:  autosync.NewSyncer(*dbPath),
-		Logger:  logger,
-		Clock:   realClock{},
-		Record:  autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
-		Timeout: 5 * time.Second,
-		Cadence: 2 * time.Second,
+		Locker:     autosync.NewFlockLocker(*syncLock),
+		Config:     autosync.NewFileConfig(*dir, *defaultURL),
+		Prober:     prober,
+		Syncer:     autosync.NewSyncer(*dbPath),
+		Logger:     logger,
+		Clock:      realClock{},
+		Record:     autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
+		ViewProber: autosync.NewQndbViewProber(),
+		Toaster:    autosync.NewQndbToaster("2000"),
+		Timeout:    5 * time.Second,
+		Cadence:    2 * time.Second,
 	})
 
 	return watch.Run(watch.Deps{
