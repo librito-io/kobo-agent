@@ -54,6 +54,18 @@ func TestToastText(t *testing.T) {
 	}
 }
 
+func TestDefaultToastAllow_HomeAndLibraryOnly(t *testing.T) {
+	want := []string{"HomePageView", "DragonLibraryView"}
+	if len(defaultToastAllow) != len(want) {
+		t.Fatalf("defaultToastAllow = %v, want %v", defaultToastAllow, want)
+	}
+	for i, v := range want {
+		if defaultToastAllow[i] != v {
+			t.Fatalf("defaultToastAllow = %v, want %v", defaultToastAllow, want)
+		}
+	}
+}
+
 func TestShouldToast_Allowlist(t *testing.T) {
 	allow := []string{"home"}
 	if !ShouldToast("home", allow) {

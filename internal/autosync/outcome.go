@@ -31,13 +31,27 @@ func (o Outcome) ExitCode() int {
 // post-sync toast may fire. ALLOWLIST (not denylist): an unknown/new view → no
 // toast, so the gate fails SAFE (never a banner over a book).
 //
-// Verified on-device (Kobo Libra Colour, Nickel 4.45, NDB 0.2.0, 2026-06-08):
-// ndbCurrentView() returns "HomePageView" on the home screen and "ReadingView" in
-// a book — both confirmed by firing an autosync on each (toast fired on home,
-// suppressed in the book). The allowlist fires the toast on home and excludes
-// every other view, so a changed/unknown view string can only drop a toast, never
-// plant one over a page.
-var defaultToastAllow = []string{"HomePageView"}
+// Full view catalog, hardware-verified (Kobo Libra Colour, Nickel 4.45, NDB
+// 0.2.0; live navigation sweep 2026-06-11 + sleep cover 2026-06-09):
+//
+//	HomePageView             home                          → toast (idle surface)
+//	DragonLibraryView        My Books AND My Notebooks (all tabs/collections —
+//	                         one shared string) → toast (browsing surfaces —
+//	                         exactly where a "new highlights" note lands)
+//	ReadingView              in-book, incl. menu/TOC overlays → NEVER (reading)
+//	IInkNotePad              inside a notebook (writing)    → no (writing focus)
+//	BookCoverDragonPowerView sleep cover                    → no (device asleep)
+//	StoreListView            store                          → no (shopping focus)
+//	SearchDialogView         search dialog                  → no (modal/keyboard)
+//	N3SettingsView           settings                       → no (task focus)
+//	MoreView                 More tab                       → no (transit hub)
+//	ConfirmationDialog       any modal dialog up            → no (suppressing a
+//	                         toast that races a dialog is the right outcome)
+//
+// Overlays do not change the view string (the reading menu still reads
+// ReadingView), so the gate holds through them. A changed/unknown string can
+// only drop a toast, never plant one over a page.
+var defaultToastAllow = []string{"HomePageView", "DragonLibraryView"}
 
 // Growth returns how much the highlight set grew since the last recorded sync —
 // the gate (and the N in the toast text) for the post-sync wake toast, which
