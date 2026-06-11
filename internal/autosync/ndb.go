@@ -2,6 +2,7 @@ package autosync
 
 import (
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -42,9 +43,28 @@ func (qndbViewProber) CurrentView() string {
 // qndbToaster fires `qndb -m mwcToast <durationMs> <main> <sub>`. Errors swallowed.
 type qndbToaster struct{ durationMs string }
 
-// NewQndbToaster builds a Toaster with a fixed duration (ms). TUNE/clamp per the
-// hardware-owed toast-duration ceiling.
-func NewQndbToaster(durationMs string) Toaster { return qndbToaster{durationMs: durationMs} }
+// toastMsCeiling is NDB's hard duration limit: NDB 0.2.0 asserts
+// 0 < toastDuration <= 5000 (NDBDbus.cc mwcToast, adapted from NickelMenu) and
+// REJECTS the whole call outside that range — over-limit doesn't truncate, it
+// silently loses the toast (qndb errors, our Toaster swallows it).
+const toastMsCeiling = 5000
+
+// clampToastMs clamps ms into NDB's accepted (0, 5000] range.
+func clampToastMs(ms int) int {
+	if ms < 1 {
+		return 1
+	}
+	if ms > toastMsCeiling {
+		return toastMsCeiling
+	}
+	return ms
+}
+
+// NewQndbToaster builds a Toaster with a fixed duration (ms), clamped to NDB's
+// accepted range so a tuning edit can never silently kill toasts.
+func NewQndbToaster(ms int) Toaster {
+	return qndbToaster{durationMs: strconv.Itoa(clampToastMs(ms))}
+}
 
 func (t qndbToaster) Toast(main, sub string) {
 	_ = exec.Command(qndbBin, "-m", "mwcToast", t.durationMs, main, sub).Run()

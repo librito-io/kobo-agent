@@ -159,7 +159,7 @@ func runAutosync(argv []string) int {
 		Clock:      realClock{},
 		Record:     autosync.NewFileRecordStore(*recordPath, time.Now),
 		ViewProber: autosync.NewQndbViewProber(),
-		Toaster:    autosync.NewQndbToaster("2000"),
+		Toaster:    autosync.NewQndbToaster(4000),
 		Timeout:    60 * time.Second,
 		Cadence:    2 * time.Second,
 	}).ExitCode()
@@ -226,7 +226,7 @@ func runWatch(argv []string) int {
 		Clock:      realClock{},
 		Record:     autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
 		ViewProber: autosync.NewQndbViewProber(),
-		Toaster:    autosync.NewQndbToaster("2000"),
+		Toaster:    autosync.NewQndbToaster(4000),
 		Timeout:    5 * time.Second,
 		Cadence:    2 * time.Second,
 	})
@@ -300,7 +300,7 @@ func runSyncNow(argv []string) int {
 
 	// 1. Best-effort "Syncing…" toast fills the cmd_output dead-gap (menu closes,
 	//    nothing on screen until we print). Separate from the in-Run success toast.
-	autosync.NewQndbToaster("4000").Toast("Syncing…", "")
+	autosync.NewQndbToaster(4000).Toast("Syncing…", "")
 
 	// 2. Delegate to the shared engine with a SHORT timeout (no WiFi bring-up;
 	//    its own WaitForConnectivity fast-fails offline). No-op View/Toaster so the

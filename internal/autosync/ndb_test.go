@@ -15,6 +15,31 @@ func TestQndbBinIsAbsolute(t *testing.T) {
 	}
 }
 
+// TestClampToastMs guards the NDB hard ceiling: NDB 0.2.0 asserts
+// 0 < toastDuration <= 5000 (NDBDbus.cc mwcToast) and REJECTS the call outside
+// that range — an over-limit duration doesn't truncate, it silently loses the
+// toast. Clamp so a future "make it longer" edit can't kill toasts entirely.
+func TestClampToastMs(t *testing.T) {
+	cases := []struct {
+		name string
+		in   int
+		want int
+	}{
+		{"negative", -5, 1},
+		{"zero (NDB rejects 0)", 0, 1},
+		{"normal", 2000, 2000},
+		{"at ceiling", 5000, 5000},
+		{"over ceiling", 6000, 5000},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := clampToastMs(c.in); got != c.want {
+				t.Errorf("clampToastMs(%d) = %d, want %d", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 func TestLastLineField(t *testing.T) {
 	cases := []struct {
 		name string
