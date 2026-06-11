@@ -14,7 +14,7 @@ func fixedWall(ts string) func() time.Time {
 func TestFileRecordStore_SuccessSetsBoth(t *testing.T) {
 	dir := t.TempDir()
 	s := NewFileRecordStore(filepath.Join(dir, "last-sync"), fixedWall("2026-06-08T16:42:00Z"))
-	s.Record(OutcomeSynced)
+	s.Record(OutcomeSynced, 0)
 
 	rec, ok := LoadRecord(filepath.Join(dir, "last-sync"))
 	if !ok {
@@ -27,8 +27,8 @@ func TestFileRecordStore_SuccessSetsBoth(t *testing.T) {
 
 func TestFileRecordStore_OfflinePreservesPriorSuccess(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "last-sync")
-	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced)
-	NewFileRecordStore(path, fixedWall("2026-06-08T12:00:00Z")).Record(OutcomeOffline)
+	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced, 0)
+	NewFileRecordStore(path, fixedWall("2026-06-08T12:00:00Z")).Record(OutcomeOffline, 0)
 
 	rec, _ := LoadRecord(path)
 	if rec.LastOutcome != "offline" {
@@ -47,8 +47,8 @@ func TestLoadRecord_MissingFile(t *testing.T) {
 
 func TestFileRecordStore_ErrorPreservesPriorSuccess(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "last-sync")
-	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced)
-	NewFileRecordStore(path, fixedWall("2026-06-08T13:00:00Z")).Record(OutcomeError)
+	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced, 0)
+	NewFileRecordStore(path, fixedWall("2026-06-08T13:00:00Z")).Record(OutcomeError, 0)
 
 	rec, _ := LoadRecord(path)
 	if rec.LastOutcome != "error" {
@@ -56,6 +56,49 @@ func TestFileRecordStore_ErrorPreservesPriorSuccess(t *testing.T) {
 	}
 	if rec.LastSuccessAt == nil || !rec.LastSuccessAt.Equal(mustTime("2026-06-08T10:00:00Z")) {
 		t.Fatalf("error must preserve the earlier success stamp, got %+v", rec.LastSuccessAt)
+	}
+}
+
+func TestFileRecordStore_SuccessStoresCount(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "last-sync")
+	s := NewFileRecordStore(path, fixedWall("2026-06-08T16:42:00Z"))
+	s.Record(OutcomeSynced, 7)
+
+	if got := s.LastCount(); got != 7 {
+		t.Fatalf("LastCount() = %d, want 7", got)
+	}
+	rec, _ := LoadRecord(path)
+	if rec.LastCount != 7 {
+		t.Fatalf("persisted last_count = %d, want 7", rec.LastCount)
+	}
+}
+
+func TestFileRecordStore_OfflinePreservesCount(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "last-sync")
+	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced, 9)
+	NewFileRecordStore(path, fixedWall("2026-06-08T12:00:00Z")).Record(OutcomeOffline, 0)
+
+	rec, _ := LoadRecord(path)
+	if rec.LastCount != 9 {
+		t.Fatalf("offline must preserve the prior count, got %d want 9", rec.LastCount)
+	}
+}
+
+func TestFileRecordStore_ErrorPreservesCount(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "last-sync")
+	NewFileRecordStore(path, fixedWall("2026-06-08T10:00:00Z")).Record(OutcomeSynced, 9)
+	NewFileRecordStore(path, fixedWall("2026-06-08T13:00:00Z")).Record(OutcomeError, 0)
+
+	rec, _ := LoadRecord(path)
+	if rec.LastCount != 9 {
+		t.Fatalf("error must preserve the prior count, got %d want 9", rec.LastCount)
+	}
+}
+
+func TestFileRecordStore_LastCountMissingIsZero(t *testing.T) {
+	s := NewFileRecordStore(filepath.Join(t.TempDir(), "nope"), fixedWall("2026-06-08T10:00:00Z"))
+	if got := s.LastCount(); got != 0 {
+		t.Fatalf("LastCount() on a missing record = %d, want 0", got)
 	}
 }
 

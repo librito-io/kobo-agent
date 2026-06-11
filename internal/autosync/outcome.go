@@ -1,5 +1,7 @@
 package autosync
 
+import "fmt"
+
 // Outcome classifies one Run. It is Run's return value (replaces the old bare
 // int) so callers — especially sync-now — can react without re-reading the
 // record file. Distinct from sync.Outcome (a different package's type).
@@ -29,13 +31,45 @@ func (o Outcome) ExitCode() int {
 // post-sync toast may fire. ALLOWLIST (not denylist): an unknown/new view → no
 // toast, so the gate fails SAFE (never a banner over a book).
 //
-// Verified on-device (Kobo Libra Colour, Nickel 4.45, NDB 0.2.0, 2026-06-08):
-// ndbCurrentView() returns "HomePageView" on the home screen and "ReadingView" in
-// a book — both confirmed by firing an autosync on each (toast fired on home,
-// suppressed in the book). The allowlist fires the toast on home and excludes
-// every other view, so a changed/unknown view string can only drop a toast, never
-// plant one over a page.
-var defaultToastAllow = []string{"HomePageView"}
+// Full view catalog, hardware-verified (Kobo Libra Colour, Nickel 4.45, NDB
+// 0.2.0; live navigation sweep 2026-06-11 + sleep cover 2026-06-09):
+//
+//	HomePageView             home                          → toast (idle surface)
+//	DragonLibraryView        My Books AND My Notebooks (all tabs/collections —
+//	                         one shared string) → toast (browsing surfaces —
+//	                         exactly where a "new highlights" note lands)
+//	ReadingView              in-book, incl. menu/TOC overlays → NEVER (reading)
+//	IInkNotePad              inside a notebook (writing)    → no (writing focus)
+//	BookCoverDragonPowerView sleep cover                    → no (device asleep)
+//	StoreListView            store                          → no (shopping focus)
+//	SearchDialogView         search dialog                  → no (modal/keyboard)
+//	N3SettingsView           settings                       → no (task focus)
+//	MoreView                 More tab                       → no (transit hub)
+//	ConfirmationDialog       any modal dialog up            → no (suppressing a
+//	                         toast that races a dialog is the right outcome)
+//
+// Overlays do not change the view string (the reading menu still reads
+// ReadingView), so the gate holds through them. A changed/unknown string can
+// only drop a toast, never plant one over a page.
+var defaultToastAllow = []string{"HomePageView", "DragonLibraryView"}
+
+// Growth returns how much the highlight set grew since the last recorded sync —
+// the gate (and the N in the toast text) for the post-sync wake toast, which
+// fires only when Growth > 0. The agent re-POSTs the FULL set every run
+// (invariant #5), so a plain re-send is NOT growth — count, not content, is the
+// signal. count is this run's imported total (the server's full-batch size);
+// last is the previously recorded count (0 when never synced). A device-side
+// delete shrinks the set (negative growth) → no toast; a same-window delete+add
+// nets the two, so N is net growth, not a literal new-capture count.
+func Growth(count, last int) int { return count - last }
+
+// ToastText renders the wake-toast message for n new highlights (n ≥ 1).
+func ToastText(n int) string {
+	if n == 1 {
+		return "1 new highlight synced to Librito"
+	}
+	return fmt.Sprintf("%d new highlights synced to Librito", n)
+}
 
 // ShouldToast reports whether a post-sync toast may fire on the given view.
 func ShouldToast(view string, allow []string) bool {

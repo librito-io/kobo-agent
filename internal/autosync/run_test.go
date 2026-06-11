@@ -182,6 +182,113 @@ func TestRun_SuppressesToastWhileReading(t *testing.T) {
 	}
 }
 
+func TestRun_ToastsOnlyWhenSetGrew(t *testing.T) {
+	// imported == last recorded count → a plain full-set re-send (invariant #5), not
+	// growth → no toast, even though the view is allow-listed (home).
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 5, books: 5},
+		&fakeLogger{}, newFakeClock())
+	d.Record = &fakeRecordStore{lastCount: 5}
+	d.Toaster = tst
+
+	Run(d)
+
+	if len(tst.mains) != 0 {
+		t.Fatalf("no growth (5→5) must not toast, got %v", tst.mains)
+	}
+}
+
+func TestRun_ToastsWhenSetGrewAtHome(t *testing.T) {
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 8, books: 8},
+		&fakeLogger{}, newFakeClock())
+	d.Record = &fakeRecordStore{lastCount: 5} // 5 → 8 = grew
+	d.Toaster = tst
+
+	Run(d)
+
+	if len(tst.mains) != 1 {
+		t.Fatalf("growth at home must toast once, got %v", tst.mains)
+	}
+	if tst.mains[0] != "3 new highlights synced to Librito" {
+		t.Fatalf("toast text = %q, want the 5→8 delta spelled out", tst.mains[0])
+	}
+}
+
+func TestRun_ToastTextSingularForOneNewHighlight(t *testing.T) {
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 6, books: 6},
+		&fakeLogger{}, newFakeClock())
+	d.Record = &fakeRecordStore{lastCount: 5} // 5 → 6 = one new
+	d.Toaster = tst
+
+	Run(d)
+
+	if len(tst.mains) != 1 || tst.mains[0] != "1 new highlight synced to Librito" {
+		t.Fatalf("toast = %v, want singular '1 new highlight synced to Librito'", tst.mains)
+	}
+}
+
+func TestRun_NoViewProbeWhenSetDidNotGrow(t *testing.T) {
+	// The grow check gates BEFORE the view probe, so a no-growth wake-reconnect makes
+	// ZERO qndb calls (otherwise every watch-path highlight pays a view-probe exec).
+	vp := &countingViewProber{view: "home"}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 5, books: 5},
+		&fakeLogger{}, newFakeClock())
+	d.Record = &fakeRecordStore{lastCount: 5} // no growth
+	d.ViewProber = vp
+	d.Toaster = &fakeToaster{}
+
+	Run(d)
+
+	if vp.calls != 0 {
+		t.Fatalf("must not probe the view when nothing grew, probed %d times", vp.calls)
+	}
+}
+
+func TestRun_RecordsImportedCount(t *testing.T) {
+	rec := &fakeRecordStore{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 6, books: 6},
+		&fakeLogger{}, newFakeClock())
+	d.Record = rec
+
+	Run(d)
+
+	if len(rec.counts) != 1 || rec.counts[0] != 6 {
+		t.Fatalf("recorded counts = %v, want [6] (the imported total)", rec.counts)
+	}
+}
+
+func TestRun_NoToastOnFailure(t *testing.T) {
+	// Offline + error both return before maybeToast, so a failed sync never toasts
+	// regardless of view or growth (acceptance: "Sync failure / offline → no toast").
+	cases := []struct {
+		name   string
+		prober *fakeProber
+		syncer *fakeSyncer
+	}{
+		{"offline", &fakeProber{snaps: []Snapshot{notReady()}}, &fakeSyncer{}},
+		{"error", &fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{err: errors.New("post import: timeout")}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			tst := &fakeToaster{}
+			d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+				c.prober, c.syncer, &fakeLogger{}, newFakeClock())
+			d.Toaster = tst
+			Run(d)
+			if len(tst.mains) != 0 {
+				t.Fatalf("%s must not toast, got %v", c.name, tst.mains)
+			}
+		})
+	}
+}
+
 func TestRun_OfflineRecordsOffline_DedupRecordsNothing(t *testing.T) {
 	recOff := &fakeRecordStore{}
 	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t"},
