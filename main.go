@@ -146,9 +146,7 @@ func runAutosync(argv []string) int {
 	if rejectPositionals(fs) {
 		return 2
 	}
-	if *recordPath == "" {
-		*recordPath = filepath.Join(*dir, "last-sync")
-	}
+	*recordPath = defaultRecordPath(*recordPath, *dir)
 
 	return autosync.Run(autosync.Deps{
 		Locker:     autosync.NewFlockLocker(*lockPath),
@@ -174,12 +172,14 @@ func runWatch(argv []string) int {
 	syncLock := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock (serializes against the udev autosync)")
 	watchLock := fs.String("watch-lock", "/tmp/librito-watch.lock", "single-instance lock for this daemon")
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path (shared with autosync)")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync; MUST match the autosync run's — the record holds the toast growth baseline)")
 	walName := fs.String("wal-name", "", "WAL filename to react to (default: <db basename>-wal; escape hatch if the spike shows a different name)")
 	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
 	_ = fs.Parse(argv)
 	if rejectPositionals(fs) {
 		return 2
 	}
+	*recordPath = defaultRecordPath(*recordPath, *dir)
 
 	wal := *walName
 	if wal == "" {
@@ -224,7 +224,7 @@ func runWatch(argv []string) int {
 		Syncer:     autosync.NewSyncer(*dbPath),
 		Logger:     logger,
 		Clock:      realClock{},
-		Record:     autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
+		Record:     autosync.NewFileRecordStore(*recordPath, time.Now),
 		ViewProber: autosync.NewQndbViewProber(),
 		Toaster:    autosync.NewQndbToaster(4000),
 		Timeout:    5 * time.Second,
@@ -253,9 +253,7 @@ func runStatus(argv []string) int {
 	if rejectPositionals(fs) {
 		return 2
 	}
-	if *recordPath == "" {
-		*recordPath = filepath.Join(*dir, "last-sync")
-	}
+	*recordPath = defaultRecordPath(*recordPath, *dir)
 
 	hasToken := resolveToken("", "", filepath.Join(*dir, "token")) != ""
 	rec, _ := autosync.LoadRecord(*recordPath)
@@ -294,9 +292,7 @@ func runSyncNow(argv []string) int {
 	if rejectPositionals(fs) {
 		return 2
 	}
-	if *recordPath == "" {
-		*recordPath = filepath.Join(*dir, "last-sync")
-	}
+	*recordPath = defaultRecordPath(*recordPath, *dir)
 
 	// 1. Best-effort "Syncing…" toast fills the cmd_output dead-gap (menu closes,
 	//    nothing on screen until we print). Separate from the in-Run success toast.
@@ -322,6 +318,18 @@ func runSyncNow(argv []string) int {
 	// 3. Map the RETURNED outcome (never re-read the record) → result dialog text.
 	fmt.Println(status.DecideSyncResult(out))
 	return out.ExitCode()
+}
+
+// defaultRecordPath resolves a --record flag value: an explicit path wins, else
+// <dir>/last-sync. SINGLE ORIGIN for all four record-touching subcommands
+// (autosync, status, sync-now, watch) — the record carries the toast growth
+// baseline, so a drifted derivation in one handler would split the baseline
+// between the udev autosync and the watch daemon (#38).
+func defaultRecordPath(record, dir string) string {
+	if record != "" {
+		return record
+	}
+	return filepath.Join(dir, "last-sync")
 }
 
 // readTrim reads a small file, returning its trimmed contents or "".
