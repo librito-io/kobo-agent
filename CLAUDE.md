@@ -144,7 +144,9 @@ that way — this repo may go public. Fixtures use fictional books/authors/text 
 shape-valid fake ISBNs, but **preserve the real Kobo data shapes** the agent
 must handle: the `epub#fragment` chapter ContentID, the literal `calibre:N`
 junk-ISBN string, a genuinely ISBN-less sideload, leading-tab highlight text,
-and an un-checkpointed WAL. The `calibre:N` literal is a format string, not data.
+a `Type='note'` noted highlight (must sync — #41), a NULL-Text `dogear` (must
+not), and an un-checkpointed WAL. The `calibre:N` literal is a format string,
+not data.
 
 ## Dev backbone (on-hardware loop)
 

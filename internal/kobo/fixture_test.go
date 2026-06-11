@@ -33,8 +33,9 @@ type fixtureRow struct {
 	annotation string // Bookmark.Annotation; the note text on a 'note' row
 }
 
-// defaultFixtureRows is the canonical set the read tests assert against. Six
-// visible highlights + one Hidden row that must be filtered out.
+// defaultFixtureRows is the canonical set the read tests assert against:
+// 8 visible rows (7 plain highlights + 1 'note'-typed noted highlight) plus two
+// that must be filtered out — the Hidden='true' row and the NULL-Text 'dogear'.
 func defaultFixtureRows() []fixtureRow {
 	return []fixtureRow{
 		// Real-ISBN book (fabricated 13-digit ISBN) — ISBN-first resolve path.
