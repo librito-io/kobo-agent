@@ -189,14 +189,15 @@ MediaTek (Mark 13 / "Monza"). See the build plan for the full mod-stack state.
 Mark anything here clearly as **not built** when working — don't let aspiration
 read as fact.
 
-- **Annotations.** Out of v1 scope, but this is a deliberately-reopened design
-  question, not a permanent rule. The PaperS3 couldn't author notes on-device (a
-  hardware limit), which is _why_ "notes are web-created" became an invariant;
-  the Kobo _can_ capture annotations, so it reopens the question: are Kobo
-  annotations the same entity as web `notes`, or a separate thing? Undecided.
-  (Overloading the existing `notes` table is blocked for technical reasons —
-  RLS, the word-index down-path keying, the one-note-per-highlight unique. A
-  separate table is the path if/when this ships.)
+- **Notes (formerly "Annotations") — DECIDED 2026-06-11: Kobo notes WILL sync.**
+  The old "notes are web-created" rule was a PaperS3 hardware artifact plus an
+  annotation/notes terminology mix-up in the original plan. Kobo's
+  `Bookmark.Annotation` (user-typed note text on a highlight) is the same user
+  intent as a web note. Not built yet — tracked as #42 (agent: send `note` in
+  the payload) blocked on web#528 (server contract: notes upsert + conflict
+  policy), with web#527 (import reconcile) covering the re-drag-with-note path.
+  (Overloading the existing `notes` table directly remains blocked — RLS, the
+  word-index down-path keying — web#528 decides separate-table vs reuse.)
 - **Steps 2–3.5 (built, hardware-verified):** on-device pairing (token to disk
   via NickelMenu) · udev WiFi-up auto-sync trigger · resident inotify watch daemon.
 - **Steps 4–5 (not built):** FBInk status dashboard · Mac installer app.
