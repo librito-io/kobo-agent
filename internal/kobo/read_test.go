@@ -12,9 +12,11 @@ func TestReadHighlights(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadHighlights: %v", err)
 	}
-	// 7 visible highlights; the one Hidden='true' row must be filtered out.
-	if len(rows) != 7 {
-		t.Fatalf("got %d highlights, want 7 (Hidden row excluded)", len(rows))
+	// 8 visible rows: 7 plain highlights + the 'note'-typed noted highlight
+	// (#41 — its Text is still highlighted text). Excluded: the Hidden='true'
+	// row and the Text-less 'dogear'.
+	if len(rows) != 8 {
+		t.Fatalf("got %d rows, want 8 (noted row included; Hidden + dogear excluded)", len(rows))
 	}
 
 	byID := map[string]struct {
@@ -29,6 +31,21 @@ func TestReadHighlights(t *testing.T) {
 	// The Hidden row must be absent.
 	if _, ok := byID["bk-hidden"]; ok {
 		t.Fatal("Hidden='true' row leaked into results")
+	}
+
+	// The noted highlight (Type='note') must be PRESENT — noting flips the row's
+	// Type but its Text is still the highlighted passage (#41).
+	noted, ok := byID["bk-noted"]
+	if !ok {
+		t.Fatal("'note'-typed highlight missing — noted highlights must sync (#41)")
+	}
+	if noted.chapter != "Chapter 3: Twin Logs" {
+		t.Fatalf("noted row chapter = %q, want 'Chapter 3: Twin Logs'", noted.chapter)
+	}
+
+	// The dogear (page mark, NULL Text) must be absent.
+	if _, ok := byID["bk-dogear"]; ok {
+		t.Fatal("dogear row leaked into results")
 	}
 
 	// Real ISBN + chapter title resolved from the ContentType=9 chapter row.

@@ -9,16 +9,18 @@ import (
 )
 
 // signatureQuery mirrors readQuery's INNER JOIN to the book content row and its
-// visibility filters, but selects only the two scalars the watch daemon needs to
-// detect new highlights: the count and the max DateCreated. Mirroring the JOIN is
-// load-bearing — an orphan highlight with no book row is excluded by readQuery's
-// INNER JOIN, so a naive count over Bookmark alone would drift from the synced
-// set. COALESCE guards max() over zero rows (NULL → "").
+// visibility filters (including Type IN — see readQuery's #41 note: noted rows
+// are 'note'-typed highlights and a direct note is BORN 'note', so the watch
+// must wake for them too), but selects only the two scalars the watch daemon
+// needs to detect new highlights: the count and the max DateCreated. Mirroring
+// the JOIN + filters is load-bearing — any drift between the two queries makes
+// the watch sync on rows the read won't send (or sleep through rows it would).
+// COALESCE guards max() over zero rows (NULL → "").
 const signatureQuery = `
 SELECT count(*), COALESCE(max(b.DateCreated), '')
 FROM Bookmark b
 JOIN content c ON c.ContentID = b.VolumeID
-WHERE b.Type = 'highlight'
+WHERE b.Type IN ('highlight', 'note')
   AND b.Hidden = 'false'
   AND b.Text IS NOT NULL
   AND trim(b.Text) <> ''`

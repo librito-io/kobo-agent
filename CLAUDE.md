@@ -99,9 +99,14 @@ Each looks wrong to someone who doesn't know the context. They are correct.
    `(book_id, source, source_uid)` and **omits `deleted_at` on conflict**, so a
    re-send never resurrects a web-deleted highlight. The agent does no local diff
    state. (Propagating a _device-side_ delete back to web is deferred — web#502.)
-6. **v1 is highlights-only.** Kobo annotations (`Bookmark.Annotation`) are NOT
-   synced. This is currently a scope choice, not a permanent rule — see
-   _Open questions_.
+6. **v1 is highlights-only — but "highlights" includes `Type='note'` rows.**
+   Kobo note _content_ (`Bookmark.Annotation`) is NOT synced (scope choice, not
+   permanent — see _Open questions_). The read/signature queries nonetheless
+   filter `Type IN ('highlight','note')`, NOT `'highlight'` alone: noting a
+   highlight flips that same row's Type to `'note'` (Text kept), and a note
+   created directly from a selection is _born_ `'note'` — narrowing to
+   `'highlight'` silently loses those passages (#41, hardware-verified
+   2026-06-11). Only the `Text` column is read either way.
 7. **WiFi: silent path only — never the non-silent connect or a reboot.** The
    agent may bring WiFi up via `qndb -m wfmConnectWirelessSilently` and wait on
    the `wmNetworkConnected` signal. It must **never** call `wfmConnectWireless`
