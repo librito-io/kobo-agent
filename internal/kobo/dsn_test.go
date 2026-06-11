@@ -25,8 +25,8 @@ func TestReadHighlights_PathWithHash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadHighlights on '#' path: %v", err)
 	}
-	if len(rows) != 7 {
-		t.Fatalf("got %d rows from '#' path, want 7 (path likely truncated at #)", len(rows))
+	if len(rows) != 8 {
+		t.Fatalf("got %d rows from '#' path, want 8 (path likely truncated at #)", len(rows))
 	}
 }
 
@@ -44,7 +44,7 @@ func TestReadHighlights_PathWithQueryChars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadHighlights on '?'-laden path: %v", err)
 	}
-	if len(rows) != 7 {
-		t.Fatalf("got %d rows, want 7", len(rows))
+	if len(rows) != 8 {
+		t.Fatalf("got %d rows, want 8", len(rows))
 	}
 }

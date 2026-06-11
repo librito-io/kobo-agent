@@ -99,9 +99,14 @@ Each looks wrong to someone who doesn't know the context. They are correct.
    `(book_id, source, source_uid)` and **omits `deleted_at` on conflict**, so a
    re-send never resurrects a web-deleted highlight. The agent does no local diff
    state. (Propagating a _device-side_ delete back to web is deferred — web#502.)
-6. **v1 is highlights-only.** Kobo annotations (`Bookmark.Annotation`) are NOT
-   synced. This is currently a scope choice, not a permanent rule — see
-   _Open questions_.
+6. **v1 is highlights-only — but "highlights" includes `Type='note'` rows.**
+   Kobo note _content_ (`Bookmark.Annotation`) is NOT synced (scope choice, not
+   permanent — see _Open questions_). The read/signature queries nonetheless
+   filter `Type IN ('highlight','note')`, NOT `'highlight'` alone: noting a
+   highlight flips that same row's Type to `'note'` (Text kept), and a note
+   created directly from a selection is _born_ `'note'` — narrowing to
+   `'highlight'` silently loses those passages (#41, hardware-verified
+   2026-06-11). Only the `Text` column is read either way.
 7. **WiFi: silent path only — never the non-silent connect or a reboot.** The
    agent may bring WiFi up via `qndb -m wfmConnectWirelessSilently` and wait on
    the `wmNetworkConnected` signal. It must **never** call `wfmConnectWireless`
@@ -139,7 +144,9 @@ that way — this repo may go public. Fixtures use fictional books/authors/text 
 shape-valid fake ISBNs, but **preserve the real Kobo data shapes** the agent
 must handle: the `epub#fragment` chapter ContentID, the literal `calibre:N`
 junk-ISBN string, a genuinely ISBN-less sideload, leading-tab highlight text,
-and an un-checkpointed WAL. The `calibre:N` literal is a format string, not data.
+a `Type='note'` noted highlight (must sync — #41), a NULL-Text `dogear` (must
+not), and an un-checkpointed WAL. The `calibre:N` literal is a format string,
+not data.
 
 ## Dev backbone (on-hardware loop)
 
@@ -184,14 +191,15 @@ MediaTek (Mark 13 / "Monza"). See the build plan for the full mod-stack state.
 Mark anything here clearly as **not built** when working — don't let aspiration
 read as fact.
 
-- **Annotations.** Out of v1 scope, but this is a deliberately-reopened design
-  question, not a permanent rule. The PaperS3 couldn't author notes on-device (a
-  hardware limit), which is _why_ "notes are web-created" became an invariant;
-  the Kobo _can_ capture annotations, so it reopens the question: are Kobo
-  annotations the same entity as web `notes`, or a separate thing? Undecided.
-  (Overloading the existing `notes` table is blocked for technical reasons —
-  RLS, the word-index down-path keying, the one-note-per-highlight unique. A
-  separate table is the path if/when this ships.)
+- **Notes (formerly "Annotations") — DECIDED 2026-06-11: Kobo notes WILL sync.**
+  The old "notes are web-created" rule was a PaperS3 hardware artifact plus an
+  annotation/notes terminology mix-up in the original plan. Kobo's
+  `Bookmark.Annotation` (user-typed note text on a highlight) is the same user
+  intent as a web note. Not built yet — tracked as #42 (agent: send `note` in
+  the payload) blocked on web#528 (server contract: notes upsert + conflict
+  policy), with web#527 (import reconcile) covering the re-drag-with-note path.
+  (Overloading the existing `notes` table directly remains blocked — RLS, the
+  word-index down-path keying — web#528 decides separate-table vs reuse.)
 - **Steps 2–3.5 (built, hardware-verified):** on-device pairing (token to disk
   via NickelMenu) · udev WiFi-up auto-sync trigger · resident inotify watch daemon.
 - **Steps 4–5 (not built):** FBInk status dashboard · Mac installer app.

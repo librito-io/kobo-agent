@@ -9,15 +9,18 @@ func TestReadHighlightSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 7 visible highlights (the Hidden='true' row is excluded), same as the
-	// ReadHighlights count.
-	if count != 7 {
-		t.Fatalf("count = %d, want 7 (Hidden row excluded)", count)
+	// 8 visible rows, same set as ReadHighlights: 7 plain highlights + the
+	// 'note'-typed noted highlight (#41). Hidden + dogear excluded. The two
+	// queries MUST agree or the watch daemon syncs on rows the read won't send.
+	if count != 8 {
+		t.Fatalf("count = %d, want 8 (noted row included; Hidden + dogear excluded)", count)
 	}
-	// Max DateCreated among VISIBLE rows is the bk-noisbn row at 19:55; the
-	// Hidden bk-hidden row (19:50) must not win.
-	if maxDate != "2026-06-04T19:55:10.120" {
-		t.Fatalf("maxDate = %q, want 2026-06-04T19:55:10.120", maxDate)
+	// Max DateCreated among visible rows is the bk-noted row at 20:01 — 'note'
+	// rows must drive the signature too (a direct note is born 'note', and the
+	// watch must wake for it). The later dogear (20:05) and the Hidden row must
+	// not win.
+	if maxDate != "2026-06-04T20:01:02.500" {
+		t.Fatalf("maxDate = %q, want 2026-06-04T20:01:02.500", maxDate)
 	}
 }
 

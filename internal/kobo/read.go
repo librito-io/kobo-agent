@@ -20,6 +20,14 @@ type RawBookmark = transform.RawBookmark
 // chapter content row (by Bookmark.ContentID, a ContentType=9 row) for the
 // chapter title. Hidden rows (device-side deleted) and empty-text rows are
 // excluded. COALESCE guards NULL text/metadata so scans never hit a NULL.
+//
+// Type IN ('highlight', 'note') — NOT just 'highlight' (#41, hardware-verified
+// 2026-06-11): adding a note flips the SAME row's Type to 'note' (Text kept),
+// and a note created directly from a selection is born 'note'. Either way the
+// Text is a highlighted passage the user expects to sync; filtering it out
+// silently loses it. Only the Text column is read — Annotation (the note's
+// content) is intentionally NOT selected (v1 highlights-only, invariant #6).
+// 'dogear' (page mark, NULL Text) stays excluded via the Text filters either way.
 const readQuery = `
 SELECT
   b.BookmarkID,
@@ -33,7 +41,7 @@ SELECT
 FROM Bookmark b
 JOIN content c        ON c.ContentID = b.VolumeID
 LEFT JOIN content ch  ON ch.ContentID = b.ContentID
-WHERE b.Type = 'highlight'
+WHERE b.Type IN ('highlight', 'note')
   AND b.Hidden = 'false'
   AND b.Text IS NOT NULL
   AND trim(b.Text) <> ''
