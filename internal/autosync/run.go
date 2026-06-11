@@ -65,11 +65,12 @@ func Run(d Deps) Outcome {
 	// Growth gate: compare this run's full-set total against the last recorded count
 	// BEFORE record() overwrites it. The agent re-sends the full set every run
 	// (invariant #5), so only a real grow (offline-backlog flush, or a capture this
-	// run imported) should toast — a plain re-send must not.
-	grew := Grew(imported, d.lastCount())
+	// run imported) should toast — a plain re-send must not. The delta is also the
+	// N in the toast text.
+	growth := Growth(imported, d.lastCount())
 	d.log(fmt.Sprintf("imported %d across %d books", imported, books))
 	d.record(OutcomeSynced, imported)
-	d.maybeToast(grew)
+	d.maybeToast(growth)
 	return OutcomeSynced
 }
 
@@ -92,13 +93,14 @@ func (d Deps) lastCount() int {
 	return d.Record.LastCount()
 }
 
-// maybeToast fires the best-effort post-sync toast iff the highlight set grew, a
-// Toaster + ViewProber are wired, and the current view is allow-listed (never over
-// a book). The grew check is first and cheap: a no-growth run never probes the view
-// (a qndb exec), so the watch path's per-capture cost stays a plain count compare.
-// sync-now leaves Toaster/ViewProber nil → no in-Run toast (it owns its feedback).
-func (d Deps) maybeToast(grew bool) {
-	if !grew {
+// maybeToast fires the best-effort post-sync toast iff the highlight set grew
+// (growth > 0; the value is the N in the text), a Toaster + ViewProber are wired,
+// and the current view is allow-listed (never over a book). The growth check is
+// first and cheap: a no-growth run never probes the view (a qndb exec), so the
+// watch path's per-capture cost stays a plain count compare. sync-now leaves
+// Toaster/ViewProber nil → no in-Run toast (it owns its feedback).
+func (d Deps) maybeToast(growth int) {
+	if growth <= 0 {
 		return
 	}
 	if d.Toaster == nil || d.ViewProber == nil {
@@ -109,6 +111,6 @@ func (d Deps) maybeToast(grew bool) {
 		allow = defaultToastAllow
 	}
 	if ShouldToast(d.ViewProber.CurrentView(), allow) {
-		d.Toaster.Toast("Highlights synced", "")
+		d.Toaster.Toast(ToastText(growth), "")
 	}
 }

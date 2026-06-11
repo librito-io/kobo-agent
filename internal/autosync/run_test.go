@@ -212,6 +212,24 @@ func TestRun_ToastsWhenSetGrewAtHome(t *testing.T) {
 	if len(tst.mains) != 1 {
 		t.Fatalf("growth at home must toast once, got %v", tst.mains)
 	}
+	if tst.mains[0] != "3 new highlights synced to Librito" {
+		t.Fatalf("toast text = %q, want the 5→8 delta spelled out", tst.mains[0])
+	}
+}
+
+func TestRun_ToastTextSingularForOneNewHighlight(t *testing.T) {
+	tst := &fakeToaster{}
+	d := deps(&fakeLocker{ok: true}, fakeConfig{token: "t", baseURL: "http://dev"},
+		&fakeProber{snaps: []Snapshot{ready()}}, &fakeSyncer{imported: 6, books: 6},
+		&fakeLogger{}, newFakeClock())
+	d.Record = &fakeRecordStore{lastCount: 5} // 5 → 6 = one new
+	d.Toaster = tst
+
+	Run(d)
+
+	if len(tst.mains) != 1 || tst.mains[0] != "1 new highlight synced to Librito" {
+		t.Fatalf("toast = %v, want singular '1 new highlight synced to Librito'", tst.mains)
+	}
 }
 
 func TestRun_NoViewProbeWhenSetDidNotGrow(t *testing.T) {

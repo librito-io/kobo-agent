@@ -14,23 +14,41 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
-func TestGrew(t *testing.T) {
+func TestGrowth(t *testing.T) {
 	cases := []struct {
 		name        string
 		count, last int
-		want        bool
+		want        int
 	}{
-		{"first sync from zero", 1, 0, true},
-		{"nothing ever, nothing now", 0, 0, false},
-		{"offline backlog flushed", 13, 10, true},
-		{"resend of unchanged set", 13, 13, false},
-		{"single new highlight", 6, 5, true},
-		{"device-side delete shrinks set", 5, 10, false},
+		{"first sync from zero", 1, 0, 1},
+		{"nothing ever, nothing now", 0, 0, 0},
+		{"offline backlog flushed", 13, 10, 3},
+		{"resend of unchanged set", 13, 13, 0},
+		{"single new highlight", 6, 5, 1},
+		{"device-side delete shrinks set", 5, 10, -5},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := Grew(c.count, c.last); got != c.want {
-				t.Errorf("Grew(%d, %d) = %v, want %v", c.count, c.last, got, c.want)
+			if got := Growth(c.count, c.last); got != c.want {
+				t.Errorf("Growth(%d, %d) = %d, want %d", c.count, c.last, got, c.want)
+			}
+		})
+	}
+}
+
+func TestToastText(t *testing.T) {
+	cases := []struct {
+		n    int
+		want string
+	}{
+		{1, "1 new highlight synced to Librito"},
+		{2, "2 new highlights synced to Librito"},
+		{13, "13 new highlights synced to Librito"},
+	}
+	for _, c := range cases {
+		t.Run(c.want, func(t *testing.T) {
+			if got := ToastText(c.n); got != c.want {
+				t.Errorf("ToastText(%d) = %q, want %q", c.n, got, c.want)
 			}
 		})
 	}
