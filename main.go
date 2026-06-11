@@ -174,11 +174,15 @@ func runWatch(argv []string) int {
 	syncLock := fs.String("lock", "/tmp/librito-autosync.lock", "shared sync lock (serializes against the udev autosync)")
 	watchLock := fs.String("watch-lock", "/tmp/librito-watch.lock", "single-instance lock for this daemon")
 	logPath := fs.String("log", filepath.Join(adsDir, "autosync.log"), "append-only result log path (shared with autosync)")
+	recordPath := fs.String("record", "", "last-sync record path (default: <dir>/last-sync; MUST match the autosync run's — the record holds the toast growth baseline)")
 	walName := fs.String("wal-name", "", "WAL filename to react to (default: <db basename>-wal; escape hatch if the spike shows a different name)")
 	probe := fs.Bool("probe", false, "log raw inotify events and run until killed (hardware spike)")
 	_ = fs.Parse(argv)
 	if rejectPositionals(fs) {
 		return 2
+	}
+	if *recordPath == "" {
+		*recordPath = filepath.Join(*dir, "last-sync")
 	}
 
 	wal := *walName
@@ -224,7 +228,7 @@ func runWatch(argv []string) int {
 		Syncer:     autosync.NewSyncer(*dbPath),
 		Logger:     logger,
 		Clock:      realClock{},
-		Record:     autosync.NewFileRecordStore(filepath.Join(*dir, "last-sync"), time.Now),
+		Record:     autosync.NewFileRecordStore(*recordPath, time.Now),
 		ViewProber: autosync.NewQndbViewProber(),
 		Toaster:    autosync.NewQndbToaster(4000),
 		Timeout:    5 * time.Second,
